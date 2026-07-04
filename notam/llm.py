@@ -39,12 +39,15 @@ _SYSTEM = (
     "several frequencies), give ONLY the gist — e.g. 'LPV minima raised, all RWYs' — "
     "and do NOT transcribe the numbers; the exact figures stay in the original NOTAM "
     "(one tap away).\n"
-    "Otherwise keep the operational essentials: what is affected, where, key limits, "
-    "and active times. Drop filler and the airport name (already grouped). No preamble."
+    "Otherwise keep the operational essentials: what is affected, where, and key "
+    "limits. Do NOT state the NOTAM's validity or effective dates/times — if it is "
+    "shown it is active, and the exact times are in the original. Only mention time "
+    "if the NOTAM limits activity to specific daily hours a pilot must plan around. "
+    "Drop filler and the airport name (already grouped). No preamble."
 )
 
 # Bump this when the prompt/style changes, so old cached summaries are re-made.
-_STYLE = "4"
+_STYLE = "5"
 
 
 def summarise(notam: dict) -> str:
