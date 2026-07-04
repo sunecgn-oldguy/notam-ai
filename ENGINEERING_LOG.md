@@ -71,8 +71,9 @@ Telefon   →  brugerens ruter (lokalt + iCloud). Forlader aldrig enheden.
 | 2. Rens + forkortelser | `notam/clean.py`, `abbreviations.py` | ✅ |
 | 3. Q-linje-parser | `notam/qline.py` | ✅ |
 | 4. Grovfilter (relevans) | `notam/relevance.py` | ✅ (kategori + militær-afdæmpning) |
-| 6. Dato/tid-filter | `notam/timing.py` | ✅ |
-| —  Enrich (limer 2+3) | `notam/enrich.py` | ✅ |
+| 6. Dato/tid-filter | `notam/timing.py` | ✅ B/C-periode + D)-skema |
+| —  D)-skema-parser | `notam/schedule.py` (+ `test_schedule.py`) | ✅ 19 tests bestået |
+| —  Enrich (limer 2+3+D) | `notam/enrich.py` | ✅ |
 | —  Lufthavnsdatabase + presets | `notam/profile.py` | ✅ |
 | 5. AI-lag (udskifteligt) | `notam/llm.py` | ✅ live: `NOTAM_LLM=claude` på Render skriver NOTAMs om til klar engelsk. (qwen-sti testes senere.) |
 | —  Cache af AI-svar | `notam/cache.py` | ✅ skitseret + testet (miss→gem→hit) |
@@ -185,3 +186,11 @@ NOTAM AI/
   QPD→"Departure", QPI→"Approach"…). AI-prompt: transskribér IKKE tabeller (minima pr. RWY,
   koordinatlister) — giv kernen ("LPV minima raised, all RWYs"), tal bliver i originalen.
   `_STYLE`→"4".
+- **AI dropper gyldighedstider** (`_STYLE`→"5"): vises ⟺ aktiv, så B/C-tider udelades af
+  AI-linjen (de er i originalen); kun daglige tidsbegrænsninger nævnes. Interim indtil D)-parser.
+- **D)-parser bygget (den rigtige, principielle løsning — ikke patch):** `notam/schedule.py`
+  `active_during(D, start, end) → True/False/None`. **None ved uparsbar/manglende D) → skjuler
+  ALDRIG** (sikkerhed frem for pænhed). Tolker H24, dagligt bånd, måned+dag(e)+bånd,
+  cross-month-range, ugedage. `timing.is_active_during` = B/C-overlap OG D) ikke-sikkert-nej.
+  Enrich udtrækker D)-feltet. **19 tests bestået** (`test_schedule.py`), inkl. Porto-kranens
+  D). Løser gentagne “tid/outside window”-punkter ved kilden.

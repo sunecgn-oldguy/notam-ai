@@ -26,10 +26,21 @@ def body_text(raw: str) -> str:
     return " ".join(text.split())
 
 
+def d_field(raw: str) -> str:
+    """Extract the D) schedule field (text after 'D)', before 'E)'), if present."""
+    e = raw.find("E)")
+    region = raw[:e] if e != -1 else raw
+    idx = region.find("D)")
+    if idx == -1:
+        return ""
+    return " ".join(region[idx + 2:].split())
+
+
 def enrich(notam: dict) -> dict:
-    """Return a copy of the NOTAM with cleaned body text and parsed Q-line."""
+    """Return a copy of the NOTAM with cleaned body text, Q-line and D) schedule."""
     return {
         **notam,
         "body": clean(body_text(notam["raw"])),
         "qline": parse_qline(notam["raw"]),
+        "d": d_field(notam["raw"]),
     }

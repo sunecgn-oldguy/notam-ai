@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from notam import schedule
+
 
 def parse_notam_dt(s: str) -> datetime | None:
     """Parse a NOTAM start/end string. None means permanent / open-ended."""
@@ -31,7 +33,19 @@ def parse_notam_dt(s: str) -> datetime | None:
 
 
 def is_active_during(notam: dict, start: datetime, end: datetime) -> bool:
-    """True if the NOTAM's active period overlaps the flight window [start, end]."""
+    """True if the NOTAM is active during the flight window [start, end].
+
+    Two gates: the B)/C) validity period must overlap the window, AND the D)
+    daily schedule (if parseable) must not confidently rule it out. An
+    unparseable or absent D) never hides the NOTAM (safe default).
+    """
+    if not _bc_overlap(notam, start, end):
+        return False
+    return schedule.active_during(notam.get("d", ""), start, end) is not False
+
+
+def _bc_overlap(notam: dict, start: datetime, end: datetime) -> bool:
+    """Does the NOTAM's B)/C) validity period overlap the flight window?"""
     n_start = parse_notam_dt(notam.get("start", ""))
     n_end = parse_notam_dt(notam.get("end", ""))
     # If a start won't parse, be safe and treat it as already active.
