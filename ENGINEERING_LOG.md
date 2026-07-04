@@ -217,3 +217,7 @@ NOTAM AI/
   (8 tråde) kører nu samtidig i `briefing.py`. Cachen er in-memory + lås + atomisk disk-skrivning
   (`cache.py`) — 33 samtidige skrivninger uden korruption. AI-delen forventes ~30 s → ~5 s.
   (Kold-start-dvale på gratis-plan er separat; løses med keep-alive/betalt.)
+- **Udbyder-agnostisk token-tæller** (`notam/usage.py`, tråd-sikker): hver udbyder rapporterer
+  forbrug i samme form (Claude `usage`, qwen `prompt_eval_count`/`eval_count`). Tæller kun ægte
+  model-kald (cache-hit/trigger/none = 0). `/usage`-endpoint viser tallene. Følger med til qwen —
+  men der er tokens gratis (kun load-mål). Resettes ved server-genstart (in-memory).

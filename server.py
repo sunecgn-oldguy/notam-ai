@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from notam import briefing
+from notam import briefing, usage
 from notam.airports import to_icao
 
 app = Flask(__name__)
@@ -39,6 +39,12 @@ def index():
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+@app.get("/usage")
+def usage_report():
+    """AI token usage since this server last started (provider-agnostic)."""
+    return jsonify(usage.snapshot())
 
 
 @app.post("/briefing")

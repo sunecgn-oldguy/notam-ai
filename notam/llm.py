@@ -24,7 +24,7 @@ import json
 import os
 import urllib.request
 
-from notam import cache, triggers
+from notam import cache, triggers, usage
 from notam.timing import parse_notam_dt
 
 _SYSTEM = (
@@ -72,9 +72,11 @@ def summarise(notam: dict) -> str:
     hit = cache.get(ckey)
     if hit is not None:
         return hit                        # free — someone already processed it
-    text = _provider()(notam)
-    cache.put(ckey, text, expires=_expiry(notam),
-              model=os.environ.get("NOTAM_LLM", "none"))
+    provider = os.environ.get("NOTAM_LLM", "none")
+    text, in_tok, out_tok = _provider()(notam)
+    if in_tok or out_tok:                 # only real model calls cost tokens
+        usage.record(provider, in_tok, out_tok)
+    cache.put(ckey, text, expires=_expiry(notam), model=provider)
     return text
 
 
@@ -90,9 +92,9 @@ def _provider():
 
 # ---------------- providers ----------------
 
-def _none(notam: dict) -> str:
+def _none(notam: dict):
     """No AI: the deterministic cleaned body from enrich.py (already readable)."""
-    return notam["body"]
+    return notam["body"], 0, 0             # (text, input_tokens, output_tokens)
 
 
 # Translation is an easy task, so the default is the cheapest/fastest model.
@@ -102,7 +104,7 @@ _CLAUDE_MODEL = os.environ.get("NOTAM_MODEL", "claude-haiku-4-5")
 _claude_client = None
 
 
-def _claude(notam: dict) -> str:
+def _claude(notam: dict):
     global _claude_client
     import anthropic  # only imported for this provider
     if _claude_client is None:
@@ -113,13 +115,14 @@ def _claude(notam: dict) -> str:
         system=_SYSTEM,
         messages=[{"role": "user", "content": notam["raw"]}],
     )
-    return "".join(b.text for b in msg.content if b.type == "text").strip()
+    text = "".join(b.text for b in msg.content if b.type == "text").strip()
+    return text, msg.usage.input_tokens, msg.usage.output_tokens
 
 
 _OLLAMA_URL = "http://localhost:11434/api/generate"
 
 
-def _qwen(notam: dict) -> str:
+def _qwen(notam: dict):
     body = json.dumps({
         "model": "qwen2.5:14b",
         "system": _SYSTEM,
@@ -129,4 +132,7 @@ def _qwen(notam: dict) -> str:
     req = urllib.request.Request(
         _OLLAMA_URL, data=body, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=120) as resp:
-        return json.load(resp)["response"].strip()
+        data = json.load(resp)
+    # Ollama reports token counts too, so the counter carries over to qwen.
+    return (data.get("response", "").strip(),
+            data.get("prompt_eval_count", 0), data.get("eval_count", 0))
