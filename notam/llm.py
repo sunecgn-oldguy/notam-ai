@@ -28,21 +28,26 @@ from notam import cache
 from notam.timing import parse_notam_dt
 
 _SYSTEM = (
-    "You rewrite a single aviation NOTAM into ONE short, plain-English line for "
-    "a professional pilot. Expand ICAO abbreviations. Keep every operational "
-    "fact (runway, frequency, altitude, area, times). Do not invent anything and "
-    "do not omit anything material. No preamble — just the line."
+    "Rewrite one aviation NOTAM as a single terse line for a professional pilot. "
+    "Keep standard aviation shorthand and units exactly as pilots read them — RWY, "
+    "TWY, ILS, VOR, DME, FT, NM, MHz, kHz, AMSL, AGL, U/S — do NOT spell them out "
+    "into words. State only the operational fact: what is affected, where, and any "
+    "altitude / distance / time limits. Drop filler and courtesy words. Do not "
+    "repeat the airport name (the briefing is already grouped by airport). No preamble."
 )
+
+# Bump this when the prompt/style changes, so old cached summaries are re-made.
+_STYLE = "2"
 
 
 def summarise(notam: dict) -> str:
     """Readable text for one enriched NOTAM, cached across all users."""
-    raw = notam["raw"]
-    hit = cache.get(raw)
+    ckey = _STYLE + "\x00" + notam["raw"]      # style version folded into the key
+    hit = cache.get(ckey)
     if hit is not None:
         return hit                        # free — someone already processed it
     text = _provider()(notam)
-    cache.put(raw, text, expires=_expiry(notam),
+    cache.put(ckey, text, expires=_expiry(notam),
               model=os.environ.get("NOTAM_LLM", "none"))
     return text
 

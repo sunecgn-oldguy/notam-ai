@@ -164,3 +164,7 @@ NOTAM AI/
   var kendt). Bygget fuld tabel fra OurAirports (`notam/iata_icao.json`, 8471 koder) + `notam/
   airports.py` (`to_icao`). Serveren oversætter nu alle koder; web-siden sender rå koder.
   Verificeret: LIS→LPPT, BOD→LFBD, OPO→LPPR.
+- **Pilot-feedback (UX + AI-stil):** (1) kategori-mærkater til engelsk (`relevance.py`);
+  (2) mærkat flyttet *over* NOTAM-teksten så teksten får fuld bredde (`web/index.html`);
+  (3) AI-prompt strammet — behold luftfarts-forkortelser/units (MHz, NM, AMSL…), skær fyld,
+  gentag ikke lufthavnsnavn. Cache-nøgle fik en `_STYLE`-version så gamle gavmilde svar erstattes.

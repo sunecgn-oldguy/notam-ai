@@ -16,20 +16,20 @@ from __future__ import annotations
 # ICAO Q-code subject groups: the first letter of the 2-letter subject
 # (e.g. "MP" -> "M" -> movement/landing area). Danish labels for the UI.
 _Q_GROUPS: dict[str, str] = {
-    "A": "Luftrum",
-    "C": "Kommunikation / radar",
-    "F": "Faciliteter og tjenester",
+    "A": "Airspace",
+    "C": "Comms / radar",
+    "F": "Facilities",
     "G": "GPS / GNSS",
-    "I": "ILS / landingssystem",
-    "L": "Banelys",
-    "M": "Bane- og manøvreområde",
-    "N": "Navigationshjælpemidler",
-    "O": "Andet",
-    "P": "ATC-procedurer (SID/STAR/approach)",
-    "R": "Luftrumsrestriktioner",
-    "S": "ATS-tjenester",
-    "W": "Advarsler (fx skydeøvelser)",
-    "X": "Andet",
+    "I": "ILS",
+    "L": "Lighting",
+    "M": "Runway / movement",
+    "N": "Navaids",
+    "O": "Other",
+    "P": "ATC procedures",
+    "R": "Airspace restr.",
+    "S": "ATS services",
+    "W": "Warnings",
+    "X": "Other",
 }
 
 # Default flight context. Overridable — this is the one place to change policy.
@@ -43,8 +43,8 @@ def category(notam: dict) -> str:
     """Human category for a NOTAM, from its Q-code subject group."""
     q = notam.get("qline")
     if not q or not q["q_subject"]:
-        return "Ukendt"
-    return _Q_GROUPS.get(q["q_subject"][0], "Andet")
+        return "Unknown"
+    return _Q_GROUPS.get(q["q_subject"][0], "Other")
 
 
 def _is_military(notam: dict) -> bool:
