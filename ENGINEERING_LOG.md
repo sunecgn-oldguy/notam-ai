@@ -74,10 +74,10 @@ Telefon   →  brugerens ruter (lokalt + iCloud). Forlader aldrig enheden.
 | 6. Dato/tid-filter | `notam/timing.py` | ✅ |
 | —  Enrich (limer 2+3) | `notam/enrich.py` | ✅ |
 | —  Lufthavnsdatabase + presets | `notam/profile.py` | ✅ |
-| 5. AI-lag (udskifteligt) | `notam/llm.py` | 🟡 skitseret: `none`/`claude`/`qwen`-udbydere. Live API-test mangler. |
+| 5. AI-lag (udskifteligt) | `notam/llm.py` | ✅ live: `NOTAM_LLM=claude` på Render skriver NOTAMs om til klar engelsk. (qwen-sti testes senere.) |
 | —  Cache af AI-svar | `notam/cache.py` | ✅ skitseret + testet (miss→gem→hit) |
 | —  Briefing-samler (JSON) | `notam/briefing.py` | ✅ skitseret + testet (hele kæden → dicts) |
-| —  HTTP-server (Flask) | `server.py` + `requirements.txt` | 🟡 push-klar; ikke deployet endnu. Guide: `DEPLOY_RENDER.md` |
+| —  HTTP-server (Flask) | `server.py` + `requirements.txt` | ✅ live på Render (https://notam-ai.onrender.com); Fase 1 (uden AI) verificeret end-to-end mod live data. Guide: `DEPLOY_RENDER.md` |
 | CLI | `main.py` | ✅ (`add`, `airports`, `presets`, `brief --dep … --etd …`-lignende) |
 
 **Prototype (mobil web-artifact):** ✅ fuld visuel prototype — input-skærm (DEP/ARR/ALT/ENR,
@@ -145,3 +145,13 @@ NOTAM AI/
 - Valgt **Render** som hosting (D13). Bygget push-klar server: `notam/briefing.py`
   (JSON-samler, testet mod live data), `server.py` (Flask, `/health` + `/briefing`),
   `requirements.txt`, `DEPLOY_RENDER.md`. Deploy udestår (kræver GitHub-repo + Render-konto).
+- Koden lagt på GitHub: **github.com/sunecgn-oldguy/notam-ai** (git init + commit + push).
+- **Deployet live på Render:** https://notam-ai.onrender.com (Frankfurt, Free-tier).
+  Fase 1 (uden AI) verificeret: `/health` + `/briefing` henter live FAA-data for EDDK/LFML/LFMN
+  og returnerer korrekt filtreret JSON — nul token-forbrug.
+- **Fase 2 live:** `ANTHROPIC_API_KEY` + `NOTAM_LLM=claude` sat i Render. Claude skriver nu
+  NOTAMs om til klar engelsk. **Cache bevist i produktion:** første kald 29,3 s (betalt) →
+  samme kald igen 0,9 s (cache-hit, gratis).
+  - ⚠️ **Åben:** første kald ~29 s ligger tæt på gunicorns 30 s worker-timeout (per-NOTAM-kald
+    sekventielt). Fix: `gunicorn … --timeout 120` i Render-start-kommandoen, og/eller skift til
+    Haiku/Sonnet (hurtigere+billigere) — gør evt. modellen til env-variabel `NOTAM_MODEL`.

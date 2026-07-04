@@ -64,9 +64,10 @@ def _none(notam: dict) -> str:
     return notam["body"]
 
 
-# Translation is an easy task; claude-haiku-4-5 / claude-sonnet-5 are much
-# cheaper and almost certainly enough. Change this one line to pick the model.
-_CLAUDE_MODEL = "claude-opus-4-8"
+# Translation is an easy task, so the default is the cheapest/fastest model.
+# Override per-deploy with the NOTAM_MODEL env var (e.g. claude-sonnet-5) — no
+# code change needed.
+_CLAUDE_MODEL = os.environ.get("NOTAM_MODEL", "claude-haiku-4-5")
 _claude_client = None
 
 
