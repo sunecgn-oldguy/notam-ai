@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# Local tooling config (not shared)
+.claude/settings.local.json
+
+# Local state & generated files (created at runtime, not source)
+data/
+route_notams.txt

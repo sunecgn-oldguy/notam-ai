@@ -1,0 +1,4 @@
+# Server dependencies (the notam/ engine itself is pure stdlib).
+flask
+gunicorn
+anthropic   # only used when NOTAM_LLM=claude

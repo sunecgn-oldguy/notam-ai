@@ -1,0 +1,100 @@
+"""The swappable AI layer (step 5).
+
+One simple interface — summarise(notam) -> readable text — hides which engine
+answers. Switch Claude for a local qwen2.5:14b by setting the NOTAM_LLM
+environment variable; nothing else in the code changes (Ousterhout: a deep
+module behind a simple interface).
+
+The call is deliberately flight-INDEPENDENT: it sees a single raw NOTAM and
+nothing about the flight. That is what makes its result identical for every
+pilot and cacheable globally (see cache.py). Flight-specific relevance stays in
+the deterministic layer (relevance.py) — it is cheap and never needs the AI.
+
+Providers (env NOTAM_LLM):
+  none   — no AI; return the deterministic cleaned text. Runs today, costs
+           nothing, and lets the whole pipeline work before any key/model.
+  claude — Anthropic API. The key lives on the server (ANTHROPIC_API_KEY),
+           never in the app.
+  qwen   — local qwen2.5:14b via Ollama on localhost.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import urllib.request
+
+from notam import cache
+from notam.timing import parse_notam_dt
+
+_SYSTEM = (
+    "You rewrite a single aviation NOTAM into ONE short, plain-English line for "
+    "a professional pilot. Expand ICAO abbreviations. Keep every operational "
+    "fact (runway, frequency, altitude, area, times). Do not invent anything and "
+    "do not omit anything material. No preamble — just the line."
+)
+
+
+def summarise(notam: dict) -> str:
+    """Readable text for one enriched NOTAM, cached across all users."""
+    raw = notam["raw"]
+    hit = cache.get(raw)
+    if hit is not None:
+        return hit                        # free — someone already processed it
+    text = _provider()(notam)
+    cache.put(raw, text, expires=_expiry(notam),
+              model=os.environ.get("NOTAM_LLM", "none"))
+    return text
+
+
+def _expiry(notam: dict) -> float | None:
+    end = parse_notam_dt(notam.get("end", ""))
+    return end.timestamp() if end is not None else None
+
+
+def _provider():
+    name = os.environ.get("NOTAM_LLM", "none")
+    return {"none": _none, "claude": _claude, "qwen": _qwen}.get(name, _none)
+
+
+# ---------------- providers ----------------
+
+def _none(notam: dict) -> str:
+    """No AI: the deterministic cleaned body from enrich.py (already readable)."""
+    return notam["body"]
+
+
+# Translation is an easy task; claude-haiku-4-5 / claude-sonnet-5 are much
+# cheaper and almost certainly enough. Change this one line to pick the model.
+_CLAUDE_MODEL = "claude-opus-4-8"
+_claude_client = None
+
+
+def _claude(notam: dict) -> str:
+    global _claude_client
+    import anthropic  # only imported for this provider
+    if _claude_client is None:
+        _claude_client = anthropic.Anthropic()   # reads ANTHROPIC_API_KEY
+    msg = _claude_client.messages.create(
+        model=_CLAUDE_MODEL,
+        max_tokens=300,
+        system=_SYSTEM,
+        messages=[{"role": "user", "content": notam["raw"]}],
+    )
+    return "".join(b.text for b in msg.content if b.type == "text").strip()
+
+
+_OLLAMA_URL = "http://localhost:11434/api/generate"
+
+
+def _qwen(notam: dict) -> str:
+    body = json.dumps({
+        "model": "qwen2.5:14b",
+        "system": _SYSTEM,
+        "prompt": notam["raw"],
+        "stream": False,
+    }).encode()
+    req = urllib.request.Request(
+        _OLLAMA_URL, data=body, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        return json.load(resp)["response"].strip()
