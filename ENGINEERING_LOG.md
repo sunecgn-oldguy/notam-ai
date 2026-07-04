@@ -221,3 +221,7 @@ NOTAM AI/
   forbrug i samme form (Claude `usage`, qwen `prompt_eval_count`/`eval_count`). Tæller kun ægte
   model-kald (cache-hit/trigger/none = 0). `/usage`-endpoint viser tallene. Følger med til qwen —
   men der er tokens gratis (kun load-mål). Resettes ved server-genstart (in-memory).
+- **Sortering efter vigtighed + NOTAM-alder (pilot):** relevante NOTAMs sorteres nu ILS →
+  Approach → Runway → Navaids → Movement → rest (`relevance.priority`; stabil). M-gruppen splittet:
+  MR/MS/MT/MU→"Runway", MX→"Taxiway", resten→"Movement". **Alder** (fx "3mo", "4d") vises efter
+  identifieren (`briefing._age` fra FAA `issueDate`), som i CrewBriefing.

@@ -12,13 +12,13 @@ cache.py), so parallel summaries never clobber each other.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timezone
 
 from notam.enrich import enrich
 from notam.faa import fetch_notams
 from notam.llm import summarise
-from notam.relevance import classify
-from notam.timing import is_active_during
+from notam.relevance import classify, priority
+from notam.timing import is_active_during, parse_notam_dt
 
 _FETCH_WORKERS = 6
 _AI_WORKERS = 8
@@ -49,11 +49,14 @@ def _process_airport(airport: tuple[str, str],
     # Military first (all disregarded); then split the civil NOTAMs by activity.
     military = [n for n in notams if n["relevance"]["tier"] == "low"]
     civil = [n for n in notams if n["relevance"]["tier"] != "low"]
+    # Relevant list sorted by category priority (ILS, Approach, Runway, …);
+    # stable, so fetch order is kept within a category.
+    high = sorted((n for n in civil if n["active"]),
+                  key=lambda n: priority(n["relevance"]["category"]))
     return {
         "icao": icao, "role": role,
         "name": notams[0]["airport_name"] if notams else "",
-        "notams": notams, "military": military,
-        "high": [n for n in civil if n["active"]],
+        "notams": notams, "military": military, "high": high,
         "inactive": [n for n in civil if not n["active"]],
     }
 
@@ -86,10 +89,30 @@ def _airport_view(g: dict) -> dict:
     }
 
 
+def _age(n: dict) -> str:
+    """How long ago the NOTAM was issued, compact — e.g. '3d', '2w', '5mo', '1y'."""
+    dt = parse_notam_dt(n.get("issued") or n.get("start", ""))
+    if dt is None:
+        return ""
+    days = (datetime.now(timezone.utc) - dt).days
+    if days < 0:
+        return "new"
+    if days == 0:
+        return "today"
+    if days < 14:
+        return f"{days}d"
+    if days < 60:
+        return f"{days // 7}w"
+    if days < 365:
+        return f"{days // 30}mo"
+    return f"{days // 365}y"
+
+
 def _view(n: dict) -> dict:
     q = n["qline"]
     return {
         "id": n["id"],
+        "age": _age(n),
         "category": n["relevance"]["category"],
         "summary": n.get("_summary") or summarise(n),   # precomputed in step 2
         "raw": n["raw"],                  # original NOTAM, always available

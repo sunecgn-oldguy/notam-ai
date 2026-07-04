@@ -22,7 +22,7 @@ _Q_GROUPS: dict[str, str] = {
     "G": "GPS / GNSS",
     "I": "ILS",
     "L": "Lighting",
-    "M": "Runway / movement",
+    "M": "Movement",
     "N": "Navaids",
     "O": "Other",
     "P": "Procedures",
@@ -34,6 +34,8 @@ _Q_GROUPS: dict[str, str] = {
 
 # Finer labels for common 2-letter Q-code subjects (checked before the group).
 _Q_SUBJECT: dict[str, str] = {
+    "MR": "Runway", "MS": "Runway", "MT": "Runway", "MU": "Runway",   # runway itself
+    "MX": "Taxiway",
     "OB": "Obstacle",
     "OL": "Obstacle lights",
     "PA": "Arrival",
@@ -44,6 +46,15 @@ _Q_SUBJECT: dict[str, str] = {
     "PO": "Approach minima",
     "PU": "Missed approach",
 }
+
+# Display order — most important first (the rest keep their fetch order after these).
+_ORDER = ["ILS", "Approach", "Approach minima", "Missed approach",
+          "Runway", "Navaids", "Movement", "Taxiway"]
+
+
+def priority(cat: str) -> int:
+    """Sort rank for a category — lower shows first (ILS, Approach, Runway, …)."""
+    return _ORDER.index(cat) if cat in _ORDER else len(_ORDER)
 
 # Default flight context. Overridable — this is the one place to change policy.
 DEFAULT_CONTEXT = {

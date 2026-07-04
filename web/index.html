@@ -50,6 +50,7 @@
   .n .top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
   .chip{font-size:10px;letter-spacing:.04em;text-transform:uppercase;font-weight:700;color:var(--chipink);background:var(--chip);border-radius:5px;padding:3px 6px;white-space:nowrap}
   .n .id{font-size:11px;color:var(--faint);font-family:var(--mono)}
+  .n .age{font-size:10px;color:var(--faint);font-family:var(--mono);border:1px solid var(--line2);border-radius:4px;padding:1px 4px}
   .n .car{margin-left:auto;color:var(--faint);font-size:12px;transition:transform .18s} .n[open] .car{transform:rotate(90deg)}
   .line{font-size:14.5px}
   .raw{margin:0;padding:12px 13px 15px;background:var(--panel2);border-top:1px dashed var(--line);font-family:var(--mono);font-size:12px;line-height:1.55;color:var(--muted);white-space:pre-wrap;overflow-x:auto}
@@ -104,7 +105,9 @@
       var rel = a.relevant.map(function(r){
         return '<details class="n"><summary>'+
           '<div class="top"><span class="chip">'+esc(r.category)+'</span>'+
-          '<span class="id">'+esc(r.id)+'</span><span class="car">▸</span></div>'+
+          '<span class="id">'+esc(r.id)+'</span>'+
+          (r.age ? '<span class="age">'+esc(r.age)+'</span>' : '')+
+          '<span class="car">▸</span></div>'+
           '<div class="line">'+esc(r.summary)+'</div>'+
           '</summary><pre class="raw">'+esc(r.raw)+'</pre></details>';
       }).join('');

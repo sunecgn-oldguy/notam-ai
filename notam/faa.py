@@ -49,6 +49,7 @@ def _normalise(n: dict) -> dict:
         "airport": n.get("facilityDesignator", ""),
         "airport_name": n.get("airportName", ""),
         "keyword": n.get("keyword", ""),
+        "issued": n.get("issueDate", ""),
         "start": n.get("startDate", ""),
         "end": n.get("endDate", ""),
         # Decode HTML entities (&apos; &amp;) the feed leaves in the text, so the
