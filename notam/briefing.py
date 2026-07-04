@@ -26,19 +26,21 @@ def build(airports: list[tuple[str, str]],
             n["relevance"] = classify(n)
             n["active"] = is_active_during(n, *window)
 
-        active = [n for n in notams if n["active"]]
-        high = [n for n in active if n["relevance"]["tier"] == "high"]
-        low = [n for n in active if n["relevance"]["tier"] == "low"]
-        inactive = [n for n in notams if not n["active"]]
+        # Military first (all military is disregarded, active or not). Then, among
+        # the civil NOTAMs, split by whether they're active in the flight window.
+        military = [n for n in notams if n["relevance"]["tier"] == "low"]
+        civil = [n for n in notams if n["relevance"]["tier"] != "low"]
+        high = [n for n in civil if n["active"]]
+        inactive = [n for n in civil if not n["active"]]
 
         out.append({
             "icao": icao,
             "role": role,
             "name": notams[0]["airport_name"] if notams else "",
             "counts": {"raw": len(notams), "relevant": len(high),
-                       "military": len(low), "inactive": len(inactive)},
+                       "military": len(military), "inactive": len(inactive)},
             "relevant": [_view(n) for n in high],
-            "military": [_raw_view(n) for n in low],
+            "military": [_raw_view(n) for n in military],
             "inactive": [_raw_view(n) for n in inactive],
         })
     return {"airports": out}

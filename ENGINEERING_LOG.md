@@ -177,3 +177,6 @@ NOTAM AI/
   (`_raw_view`); web-siden folder dem ud som `<pre class="raw">`.
 - **Pilot-regel til TODO:** vises ⟺ aktiv på landingstidspunktet (kræver D)-parser); inaktive
   hører i "outside flight window", og tider udelades for viste (underforstået aktive).
+- **Rækkefølge-fix (grupper):** militær tjekkes nu FØR tid, så al militær havner i
+  "Military — disregarded" (aktiv eller ej). "Outside window" indeholder kun civile inaktive.
+  Pilot fandt P5587 (BUNDESWEHR/ETNK, FAA=MILITARY) forkert i outside window.
