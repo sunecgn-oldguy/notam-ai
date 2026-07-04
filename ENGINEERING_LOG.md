@@ -225,3 +225,6 @@ NOTAM AI/
   Approach → Runway → Navaids → Movement → rest (`relevance.priority`; stabil). M-gruppen splittet:
   MR/MS/MT/MU→"Runway", MX→"Taxiway", resten→"Movement". **Alder** (fx "3mo", "4d") vises efter
   identifieren (`briefing._age` fra FAA `issueDate`), som i CrewBriefing.
+- **Sammenfoldelige lufthavne (pilot):** hver AD er nu en dropdown i web-UI'et — kollapset viser
+  kun overskrift + antal (kort dokument), udfoldet viser NOTAMerne for netop den AD. Skalerer til
+  mange lufthavne uden at blive uoverskuelig.
