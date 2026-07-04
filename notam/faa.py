@@ -9,6 +9,7 @@ Only the Python standard library is used, so there is nothing to install.
 
 from __future__ import annotations
 
+import html
 import json
 import urllib.parse
 import urllib.request
@@ -50,5 +51,9 @@ def _normalise(n: dict) -> dict:
         "keyword": n.get("keyword", ""),
         "start": n.get("startDate", ""),
         "end": n.get("endDate", ""),
-        "raw": (n.get("icaoMessage") or "").strip(),
+        # Decode HTML entities (&apos; &amp;) the feed leaves in the text, so the
+        # original NOTAM we display reads cleanly — this is the true character,
+        # not an edit. (The FAA's own data may still contain garbled repetition;
+        # we show that faithfully rather than "fix" a malformed source.)
+        "raw": html.unescape((n.get("icaoMessage") or "").strip()),
     }

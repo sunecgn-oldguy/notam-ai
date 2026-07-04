@@ -24,7 +24,7 @@ import json
 import os
 import urllib.request
 
-from notam import cache
+from notam import cache, triggers
 from notam.timing import parse_notam_dt
 
 _SYSTEM = (
@@ -47,16 +47,21 @@ _SYSTEM = (
     "Otherwise keep the operational essentials: what is affected, where, and key "
     "limits. Do NOT state the NOTAM's validity or effective dates/times — if it is "
     "shown it is active, and the exact times are in the original. Only mention time "
-    "if the NOTAM limits activity to specific daily hours a pilot must plan around. "
+    "if the NOTAM limits activity to specific daily hours a pilot must plan around.\n"
+    "Do NOT include raw latitude/longitude coordinates — pilots can't use them and "
+    "the exact position is in the original; if the NOTAM gives a bearing/distance "
+    "from the airport (e.g. RDL179/2.3NM), keep that instead.\n"
     "Drop filler and the airport name (already grouped). No preamble."
 )
 
 # Bump this when the prompt/style changes, so old cached summaries are re-made.
-_STYLE = "6"
+_STYLE = "7"
 
 
 def summarise(notam: dict) -> str:
     """Readable text for one enriched NOTAM, cached across all users."""
+    if triggers.is_document_ref(notam):
+        return triggers.summary(notam)         # deterministic, no AI (no hallucination)
     ckey = _STYLE + "\x00" + notam["raw"]      # style version folded into the key
     hit = cache.get(ckey)
     if hit is not None:

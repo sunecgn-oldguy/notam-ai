@@ -34,6 +34,8 @@ _Q_GROUPS: dict[str, str] = {
 
 # Finer labels for common 2-letter Q-code subjects (checked before the group).
 _Q_SUBJECT: dict[str, str] = {
+    "OB": "Obstacle",
+    "OL": "Obstacle lights",
     "PA": "Arrival",
     "PD": "Departure",
     "PH": "Holding",

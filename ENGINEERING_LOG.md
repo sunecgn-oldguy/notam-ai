@@ -194,3 +194,13 @@ NOTAM AI/
   cross-month-range, ugedage. `timing.is_active_during` = B/C-overlap OG D) ikke-sikkert-nej.
   Enrich udtrækker D)-feltet. **19 tests bestået** (`test_schedule.py`), inkl. Porto-kranens
   D). Løser gentagne “tid/outside window”-punkter ved kilden.
+
+- **Trigger-/AIP-SUP-NOTAMs deterministisk** (`notam/triggers.py` + `test_triggers.py`): ingen
+  AI, ingen hallucination — udtræk reference (+ evt. SUBJECT) fra NOTAM'ens egen tekst. Løser
+  LYS-fejlen hvor AI opdigtede "ILS App" på en tom trigger.
+- **AI dropper rå lat/long** (piloter kan ikke bruge dem; positionen er i originalen; behold
+  bearing/afstand hvis givet). `_STYLE`→"7".
+- **Kategori:** `OB`→"Obstacle", `OL`→"Obstacle lights" (kran stod som "Other").
+- **Original NOTAM: HTML-koder afkodes** (`&apos;`→`'`, `&amp;`→`&`) også i den *viste* original
+  (`faa._normalise`) — trofast, men læsbart. Malformet kilde (fx tredoblet "121.255MHZ") vises
+  trofast; vi "reparerer" aldrig og opfinder aldrig.
