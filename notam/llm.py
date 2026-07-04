@@ -29,8 +29,11 @@ from notam.timing import parse_notam_dt
 
 _SYSTEM = (
     "Rewrite one aviation NOTAM as the shortest possible line for a professional "
-    "pilot — a few words where you can. Keep aviation shorthand and units as pilots "
-    "read them (RWY, ILS, VOR, DME, FT, NM, MHz, AMSL, U/S); do not spell them out.\n"
+    "pilot. Shorten by dropping filler, NOT by abbreviating. Mirror the NOTAM's own "
+    "wording: keep its aviation shorthand and units (RWY, ILS, MHz, FT, NM, U/S) — "
+    "do not spell them out — and do NOT invent your own abbreviations for words it "
+    "spells out (if it writes MOVEMENT keep MOVEMENT, never 'Mvt'). Any abbreviation "
+    "stays UPPERCASE, as in the source.\n"
     "SAFETY-CRITICAL: use ONLY what the NOTAM text says. Never add a system, "
     "facility, procedure or detail that is not written. Do NOT guess what an AIP "
     "Supplement, procedure or referenced document contains — if the NOTAM only "
@@ -58,7 +61,7 @@ _SYSTEM = (
 )
 
 # Bump this when the prompt/style changes, so old cached summaries are re-made.
-_STYLE = "8"
+_STYLE = "9"
 
 
 def summarise(notam: dict) -> str:

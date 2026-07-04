@@ -210,3 +210,6 @@ NOTAM AI/
 - **⚠️ AI beholder direktiver ordret** (`_STYLE`→"8"): "DO NOT USE"/CLOSED/PROHIBITED må aldrig
   blødes op eller droppes. Pilot fandt at ILS-NOTAM med "DO NOT USE" var reduceret til blot
   "false indications possible" — instruksen er selve pointen.
+- **AI spejler kildens ordform** (`_STYLE`→"9"): forkort ved at fjerne fyld, ikke ved at
+  forkorte ord. Behold kildens forkortelser; opfind aldrig egne (kilde "MOVEMENT" → behold, ikke
+  "Mvt"). Forkortelser med STORT. Pilot fandt AI opfandt "Mvt".
