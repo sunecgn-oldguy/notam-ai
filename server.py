@@ -16,14 +16,23 @@ Codes are ICAO for now, separated by space / comma / dot.
 
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime, timedelta, timezone
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 
 from notam import briefing
 
 app = Flask(__name__)
+
+_WEB = os.path.join(os.path.dirname(__file__), "web")
+
+
+@app.get("/")
+def index():
+    """A simple browser UI for trying the engine (served from the same origin)."""
+    return send_from_directory(_WEB, "index.html")
 
 
 @app.get("/health")

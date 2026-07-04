@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NOTAM AI</title>
+<style>
+  :root {
+    --bg:#EAEEF3; --panel:#fff; --panel2:#F4F7FA; --ink:#16222F; --muted:#5B6C7C;
+    --faint:#8496A6; --line:#D6DEE7; --line2:#E4EAF0; --accent:#B76E12; --link:#1D6C83;
+    --ok:#2E7D52; --warn:#A9701A; --crit:#BE382F; --chip:#E7EEF4; --chipink:#40566A;
+    --bar:#10202E; --barink:#E7EEF4;
+    --ui:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#0B121B;--panel:#121D2A;--panel2:#172433;--ink:#DBE5F0;--muted:#8D9DB1;
+    --faint:#66788C;--line:#22334A;--line2:#1A2838;--accent:#E8A13A;--link:#5FC2C0;
+    --ok:#52B57A;--warn:#E0A445;--crit:#E5695F;--chip:#1B2A3D;--chipink:#A9BCD0;
+    --bar:#060D15;--barink:#DBE5F0;}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .bar{position:sticky;top:0;z-index:10;background:var(--bar);color:var(--barink);display:flex;align-items:baseline;gap:9px;padding:15px 16px}
+  .bar b{font-weight:700} .bar .pl{color:var(--accent)}
+  .bar .tg{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+  main{max-width:680px;margin:0 auto;padding:16px 14px 44px}
+  h1{font-size:18px;margin:4px 2px 12px}
+  .row2{display:flex;gap:10px}
+  .field{margin-bottom:13px;flex:1}
+  .field label{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--ink);margin:0 2px 6px}
+  .field label span{color:var(--faint);font-weight:400;letter-spacing:0;text-transform:none}
+  input{width:100%;font-family:var(--mono);font-size:16px;letter-spacing:.05em;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 13px;text-transform:uppercase}
+  input::placeholder{color:var(--faint);font-family:var(--ui);text-transform:none;letter-spacing:0}
+  input:focus{outline:none;border-color:var(--link);box-shadow:0 0 0 3px color-mix(in srgb,var(--link) 22%,transparent)}
+  .plain{font-family:var(--ui)!important;text-transform:none!important;letter-spacing:0!important;font-size:15px!important}
+  .hint{font-size:11.5px;color:var(--faint);margin:2px 2px 16px}
+  .hint code{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line2);border-radius:4px;padding:0 4px}
+  .btn{width:100%;cursor:pointer;font-family:var(--ui);font-size:15.5px;font-weight:650;color:#fff;background:var(--accent);border:0;border-radius:12px;padding:15px}
+  .btn:disabled{opacity:.6;cursor:default}
+  .status{text-align:center;color:var(--muted);font-size:13.5px;margin:22px 0}
+  .apthead{display:flex;align-items:baseline;gap:9px;margin:24px 4px 6px}
+  .apthead .code{font-size:17px;font-weight:700} .apthead .nm{font-size:12.5px;color:var(--muted)}
+  .apthead .badge{margin-left:auto;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);border:1px solid var(--line);border-radius:999px;padding:2px 9px}
+  .counts{font-size:12px;color:var(--muted);margin:0 4px 8px;font-variant-numeric:tabular-nums}
+  .glbl{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin:14px 4px 6px;font-weight:600}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .n{border-top:1px solid var(--line2)} .n:first-child{border-top:0}
+  .n>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;padding:12px 13px}
+  .n>summary::-webkit-details-marker{display:none}
+  .chip{font-size:10px;letter-spacing:.04em;text-transform:uppercase;font-weight:700;color:var(--chipink);background:var(--chip);border-radius:5px;padding:3px 6px;margin-top:1px;white-space:nowrap}
+  .line{font-size:14.5px} .sub{font-size:12px;color:var(--muted);margin-top:2px}
+  .car{color:var(--faint);font-size:12px;margin-top:3px;transition:transform .18s} .n[open] .car{transform:rotate(90deg)}
+  .raw{margin:0;padding:12px 13px 15px;background:var(--panel2);border-top:1px dashed var(--line);font-family:var(--mono);font-size:12px;line-height:1.55;color:var(--muted);white-space:pre-wrap;overflow-x:auto}
+  .raw::before{content:"Original NOTAM — verbatim";display:block;font-family:var(--ui);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:9px}
+  .fold{margin-top:10px;background:var(--panel);border:1px solid var(--line);border-radius:11px}
+  .fold>summary{list-style:none;cursor:pointer;display:flex;gap:8px;align-items:center;padding:11px 13px;font-size:13px;color:var(--muted)}
+  .fold>summary::-webkit-details-marker{display:none}
+  .fold .cnt{margin-left:auto;font-size:11px;color:var(--faint);background:var(--panel2);border:1px solid var(--line2);border-radius:999px;padding:1px 8px}
+  .fold .ids{padding:2px 13px 12px;font-family:var(--mono);font-size:11.5px;color:var(--faint);line-height:1.8;word-break:break-word}
+  .note{margin-top:24px;font-size:11.5px;color:var(--faint);line-height:1.6;border-top:1px solid var(--line2);padding-top:14px}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+  <div class="bar"><b>NOTAM&nbsp;<span class="pl">AI</span></b> <span class="tg">route briefing</span></div>
+  <main>
+    <h1>New route briefing</h1>
+    <div class="row2">
+      <div class="field"><label>DEP</label><input id="dep" value="CGN" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="CGN / EDDK"></div>
+      <div class="field"><label>ARR</label><input id="arr" value="MRS" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="MRS / LFML"></div>
+    </div>
+    <div class="field"><label>ALT <span>· alternate(s)</span></label><input id="alt" value="NCE" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="NCE, LFMT"></div>
+    <div class="field"><label>ENR <span>· enroute, optional</span></label><input id="enr" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="LSGG LFLL"></div>
+    <p class="hint">Separate codes with space, comma <code>,</code> or dot <code>.</code> — IATA or ICAO.</p>
+    <div class="row2">
+      <div class="field"><label>ETD <span>· UTC</span></label><input class="plain" id="etd" type="time" value="08:00"></div>
+      <div class="field"><label>EET <span>· hh:mm</span></label><input class="plain" id="eet" type="text" inputmode="numeric" value="01:30" placeholder="01:30"></div>
+    </div>
+    <button class="btn" id="go">Get briefing</button>
+    <div class="status" id="status"></div>
+    <div id="out"></div>
+    <div class="note" id="note" hidden><strong>Not for operational use.</strong> Live FAA data, AI-shortened. Every dropdown holds the complete original NOTAM verbatim — nothing is deleted, only prioritised, merged or collapsed. Always cross-check your official briefing.</div>
+  </main>
+
+<script>
+  var IATA={CGN:'EDDK',MRS:'LFML',NCE:'LFMN',CPH:'EKCH',FAE:'EKVG',BLL:'EKBI',CDG:'LFPG',
+    FRA:'EDDF',LHR:'EGLL',AMS:'EHAM',GVA:'LSGG',LYS:'LFLL',ZRH:'LSZH',MUC:'EDDM',DUS:'EDDL',VIE:'LOWW'};
+  function codes(raw){return raw.split(/[\s,.]+/).map(function(s){return s.trim().toUpperCase();}).filter(Boolean)
+    .map(function(t){return (t.length===3&&IATA[t])?IATA[t]:t;}).join(' ');}
+  function esc(s){return (s||'').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+
+  var out=document.getElementById('out'), status=document.getElementById('status'), note=document.getElementById('note'), btn=document.getElementById('go');
+
+  function render(data){
+    out.innerHTML = data.airports.map(function(a){
+      var c=a.counts;
+      var rel = a.relevant.map(function(r){
+        var sub = r.summary ? '' : '';
+        return '<details class="n"><summary>'+
+          '<span class="chip">'+esc(r.category)+'</span>'+
+          '<span><span class="line">'+esc(r.summary)+'</span><span class="sub">'+esc(r.id)+'</span></span>'+
+          '<span class="car">▸</span></summary>'+
+          '<pre class="raw">'+esc(r.raw)+'</pre></details>';
+      }).join('');
+      var folds='';
+      if(a.military_ids.length) folds+='<details class="fold"><summary>Military — disregarded <span class="cnt">'+a.military_ids.length+'</span></summary><div class="ids">'+a.military_ids.join(' · ')+'</div></details>';
+      if(a.inactive_ids.length) folds+='<details class="fold"><summary>Outside your flight window <span class="cnt">'+a.inactive_ids.length+'</span></summary><div class="ids">'+a.inactive_ids.join(' · ')+'</div></details>';
+      return '<div class="apthead"><span class="code">'+esc(a.icao)+'</span><span class="nm">'+esc(a.name)+'</span><span class="badge">'+esc(a.role)+'</span></div>'+
+        '<div class="counts">'+c.raw+' raw · '+c.relevant+' relevant · '+(c.military+c.inactive)+' filtered</div>'+
+        '<div class="card">'+(rel||'<div style="padding:12px 13px;color:var(--faint);font-size:13px">No relevant NOTAMs in your window.</div>')+'</div>'+folds;
+    }).join('');
+    note.hidden = false;
+  }
+
+  btn.addEventListener('click', function(){
+    var body = {
+      dep: codes(document.getElementById('dep').value),
+      arr: codes(document.getElementById('arr').value),
+      alt: codes(document.getElementById('alt').value),
+      enr: codes(document.getElementById('enr').value),
+      etd: document.getElementById('etd').value.replace(':',''),
+      eet: document.getElementById('eet').value.trim()
+    };
+    out.innerHTML=''; note.hidden=true; btn.disabled=true;
+    status.textContent='Fetching live NOTAMs and rewriting… (first call can take ~30s while the free server wakes)';
+    fetch('/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(function(r){ if(!r.ok) throw new Error('server '+r.status); return r.json(); })
+      .then(function(data){ status.textContent=''; render(data); })
+      .catch(function(e){ status.textContent='Something went wrong ('+e.message+'). If the server was asleep, try again.'; })
+      .finally(function(){ btn.disabled=false; });
+  });
+</script>
+</body>
+</html>
