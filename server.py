@@ -23,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 from flask import Flask, jsonify, request, send_from_directory
 
 from notam import briefing
+from notam.airports import to_icao
 
 app = Flask(__name__)
 
@@ -47,7 +48,7 @@ def make_briefing():
 
 
 def _codes(raw: str) -> list[str]:
-    return [c.upper() for c in re.split(r"[\s,.]+", str(raw)) if c][:20]
+    return [to_icao(c) for c in re.split(r"[\s,.]+", str(raw)) if c][:20]
 
 
 def _airports(data: dict) -> list[tuple[str, str]]:

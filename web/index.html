@@ -83,10 +83,8 @@
   </main>
 
 <script>
-  var IATA={CGN:'EDDK',MRS:'LFML',NCE:'LFMN',CPH:'EKCH',FAE:'EKVG',BLL:'EKBI',CDG:'LFPG',
-    FRA:'EDDF',LHR:'EGLL',AMS:'EHAM',GVA:'LSGG',LYS:'LFLL',ZRH:'LSZH',MUC:'EDDM',DUS:'EDDL',VIE:'LOWW'};
-  function codes(raw){return raw.split(/[\s,.]+/).map(function(s){return s.trim().toUpperCase();}).filter(Boolean)
-    .map(function(t){return (t.length===3&&IATA[t])?IATA[t]:t;}).join(' ');}
+  // Send raw codes (IATA or ICAO); the server resolves IATA->ICAO via the full table.
+  function codes(raw){return raw.split(/[\s,.]+/).map(function(s){return s.trim().toUpperCase();}).filter(Boolean).join(' ');}
   function esc(s){return (s||'').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
 
   var out=document.getElementById('out'), status=document.getElementById('status'), note=document.getElementById('note'), btn=document.getElementById('go');

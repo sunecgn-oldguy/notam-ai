@@ -122,7 +122,7 @@ NOTAM AI/
   ærlige test af om qwen2.5:14b er god nok.
 - **Modelvalg til Claude:** oversættelse er let → `claude-haiku-4-5`/`claude-sonnet-5` er
   billigere og nok. Sat som `_CLAUDE_MODEL` i `llm.py` (ét sted).
-- **Fuld IATA→ICAO-opslagstabel** (prototypen har kun en demo-håndfuld).
+- ~~Fuld IATA→ICAO-opslagstabel~~ ✅ løst (se ændringslog).
 - **Naviair-tilladelse** til de danske/færøske data som juridisk backup før udgivelse.
 - **Enroute-geometri:** geometri-filteret bliver først rigtig stærkt når vi tilføjer
   NOTAMs *langs* ruten (militærområder, GPS-jamming).
@@ -155,3 +155,12 @@ NOTAM AI/
   - ⚠️ **Åben:** første kald ~29 s ligger tæt på gunicorns 30 s worker-timeout (per-NOTAM-kald
     sekventielt). Fix: `gunicorn … --timeout 120` i Render-start-kommandoen, og/eller skift til
     Haiku/Sonnet (hurtigere+billigere) — gør evt. modellen til env-variabel `NOTAM_MODEL`.
+- **Løst:** `--timeout 120` sat i Render; model gjort valgbar (`NOTAM_MODEL`, standard nu
+  `claude-haiku-4-5` — hurtigere+billigere).
+- **Browser-UI live:** `web/index.html` serveres på `https://notam-ai.onrender.com/` (samme
+  origin → ingen CORS). Rigtig udfyld-og-få-briefing-side på telefonen, drevet af live-motoren.
+  Forsiden verificeret oppe (HTTP 200). Erstatter samtidig den tidligere "/"-404.
+- **Bugfix — komplet IATA→ICAO:** pilot fandt at fx LIS/BOD/OPO gav 0 NOTAMs (kun demo-koder
+  var kendt). Bygget fuld tabel fra OurAirports (`notam/iata_icao.json`, 8471 koder) + `notam/
+  airports.py` (`to_icao`). Serveren oversætter nu alle koder; web-siden sender rå koder.
+  Verificeret: LIS→LPPT, BOD→LFBD, OPO→LPPR.
