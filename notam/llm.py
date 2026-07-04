@@ -31,6 +31,11 @@ _SYSTEM = (
     "Rewrite one aviation NOTAM as the shortest possible line for a professional "
     "pilot — a few words where you can. Keep aviation shorthand and units as pilots "
     "read them (RWY, ILS, VOR, DME, FT, NM, MHz, AMSL, U/S); do not spell them out.\n"
+    "SAFETY-CRITICAL: use ONLY what the NOTAM text says. Never add a system, "
+    "facility, procedure or detail that is not written. Do NOT guess what an AIP "
+    "Supplement, procedure or referenced document contains — if the NOTAM only "
+    "points to a supplement/document, say just that (e.g. 'AIP SUP 089/26 active, "
+    "Phase 1').\n"
     "SAFETY-CRITICAL: any number, coordinate, frequency or UNIT you include must be "
     "copied exactly as the source writes it. NEVER convert feet<->metres, never "
     "round, never relabel a unit. If the source gives metres keep metres; if feet "
@@ -47,7 +52,7 @@ _SYSTEM = (
 )
 
 # Bump this when the prompt/style changes, so old cached summaries are re-made.
-_STYLE = "5"
+_STYLE = "6"
 
 
 def summarise(notam: dict) -> str:
