@@ -228,3 +228,9 @@ NOTAM AI/
 - **Sammenfoldelige lufthavne (pilot):** hver AD er nu en dropdown i web-UI'et — kollapset viser
   kun overskrift + antal (kort dokument), udfoldet viser NOTAMerne for netop den AD. Skalerer til
   mange lufthavne uden at blive uoverskuelig.
+- **Flyve-vejr integreret (pilot):** `notam/weather.py` henter METAR/TAF fra aviationweather.gov
+  (gratis, ingen nøgle, global — samme filosofi som FAA). **Ingen AI** — METAR/TAF vises råt
+  (piloter læser dem flydende); kun en deterministisk **farvekategori** beregnes fra sigt+skybase:
+  CAVOK (grøn) / GOOD (blå) / MARGINAL (amber) / LOW VIS (rød) — pilotens tærskler, værste af
+  sigt/base afgør. 10 tests (`test_weather.py`). Hentes parallelt pr. AD i `briefing.py`; vises som
+  farvet badge på lufthavns-overskriften + Weather-dropdown med rå METAR/TAF.

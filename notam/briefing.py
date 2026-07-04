@@ -14,6 +14,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
+from notam import weather
 from notam.enrich import enrich
 from notam.faa import fetch_notams
 from notam.llm import summarise
@@ -58,6 +59,7 @@ def _process_airport(airport: tuple[str, str],
         "name": notams[0]["airport_name"] if notams else "",
         "notams": notams, "military": military, "high": high,
         "inactive": [n for n in civil if not n["active"]],
+        "weather": weather.fetch(icao),
     }
 
 
@@ -83,6 +85,7 @@ def _airport_view(g: dict) -> dict:
         "name": g["name"],
         "counts": {"raw": len(g["notams"]), "relevant": len(g["high"]),
                    "military": len(g["military"]), "inactive": len(g["inactive"])},
+        "weather": g["weather"],
         "relevant": [_view(n) for n in g["high"]],
         "military": [_raw_view(n) for n in g["military"]],
         "inactive": [_raw_view(n) for n in g["inactive"]],
