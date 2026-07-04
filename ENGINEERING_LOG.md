@@ -207,3 +207,6 @@ NOTAM AI/
 - **Trigger-summary udtrækker nu indhold:** boilerplate (reference, TRIGGER NOTAM, validitet,
   URL, "announced by NOTAM") fjernes, resten beholdes. A2931 → "AIP SUP 089/26: TAXIWAY TL
   rehabilitation works" (indhold med); A3951 (tomt) → uændret "see supplement". Testet.
+- **⚠️ AI beholder direktiver ordret** (`_STYLE`→"8"): "DO NOT USE"/CLOSED/PROHIBITED må aldrig
+  blødes op eller droppes. Pilot fandt at ILS-NOTAM med "DO NOT USE" var reduceret til blot
+  "false indications possible" — instruksen er selve pointen.

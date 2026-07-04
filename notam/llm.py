@@ -45,9 +45,12 @@ _SYSTEM = (
     "and do NOT transcribe the numbers; the exact figures stay in the original NOTAM "
     "(one tap away).\n"
     "Otherwise keep the operational essentials: what is affected, where, and key "
-    "limits. Do NOT state the NOTAM's validity or effective dates/times — if it is "
-    "shown it is active, and the exact times are in the original. Only mention time "
-    "if the NOTAM limits activity to specific daily hours a pilot must plan around.\n"
+    "limits. Keep explicit directives and prohibitions verbatim — DO NOT USE, "
+    "CLOSED, PROHIBITED, MANDATORY, CONTACT … — never soften, paraphrase away, or "
+    "drop them; the instruction is the whole point.\n"
+    "Do NOT state the NOTAM's validity or effective dates/times — if it is shown it "
+    "is active, and the exact times are in the original. Only mention time if the "
+    "NOTAM limits activity to specific daily hours a pilot must plan around.\n"
     "Do NOT include raw latitude/longitude coordinates — pilots can't use them and "
     "the exact position is in the original; if the NOTAM gives a bearing/distance "
     "from the airport (e.g. RDL179/2.3NM), keep that instead.\n"
@@ -55,7 +58,7 @@ _SYSTEM = (
 )
 
 # Bump this when the prompt/style changes, so old cached summaries are re-made.
-_STYLE = "7"
+_STYLE = "8"
 
 
 def summarise(notam: dict) -> str:
