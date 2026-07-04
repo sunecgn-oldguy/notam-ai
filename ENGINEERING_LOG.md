@@ -204,3 +204,6 @@ NOTAM AI/
 - **Original NOTAM: HTML-koder afkodes** (`&apos;`→`'`, `&amp;`→`&`) også i den *viste* original
   (`faa._normalise`) — trofast, men læsbart. Malformet kilde (fx tredoblet "121.255MHZ") vises
   trofast; vi "reparerer" aldrig og opfinder aldrig.
+- **Trigger-summary udtrækker nu indhold:** boilerplate (reference, TRIGGER NOTAM, validitet,
+  URL, "announced by NOTAM") fjernes, resten beholdes. A2931 → "AIP SUP 089/26: TAXIWAY TL
+  rehabilitation works" (indhold med); A3951 (tomt) → uændret "see supplement". Testet.

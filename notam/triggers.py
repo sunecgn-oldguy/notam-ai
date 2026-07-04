@@ -11,9 +11,13 @@ from __future__ import annotations
 
 import re
 
-_REF = re.compile(r"\bAIP\s+(?:SUP|AMDT)\s+[\w/]+", re.I)
-_SUBJECT = re.compile(r"SUBJECT\s*:?\s*(.+)", re.I | re.S)
+_REF = re.compile(r"\bAIP\s+(?:SUP|AMDT)\s+\d[\w/]*", re.I)   # number starts with a digit
 _PHASE = re.compile(r"\bPHASE\s*(\d)", re.I)
+_BARE_PHASE = re.compile(r"P\w*HASE\s*\d\s*(?:ACT|ACTIVE)?", re.I)  # tolerate 'PAHASE' typo
+
+# Segments that add no operational content — dropped when extracting the subject.
+_BOILER = ("WWW", "HTTP", "AVAILABLE AT", "AVBL AT", "VALIDITY",
+           "ANNOUNCED BY NOTAM", "WILL BE ANNOUNCED")
 
 
 def is_document_ref(notam: dict) -> bool:
@@ -25,17 +29,35 @@ def is_document_ref(notam: dict) -> bool:
 
 
 def summary(notam: dict) -> str:
-    """Honest, AI-free summary built only from the NOTAM's own text."""
+    """Honest, AI-free summary built only from the NOTAM's own text.
+
+    Strip boilerplate (reference, TRIGGER NOTAM, validity, URL, "announced by
+    NOTAM") and keep whatever real content is left — e.g. "TAXIWAY TL
+    rehabilitation works". If nothing meaningful remains, defer to the supplement.
+    """
     text = " ".join(notam.get("body", "").split())
     ref_m = _REF.search(text)
     ref = ref_m.group(0).upper() if ref_m else "AIP document"
 
-    subj_m = _SUBJECT.search(text)
-    if subj_m:
-        subject = " ".join(subj_m.group(1).split()).rstrip(" .,")
-        if len(subject) > 140:
-            subject = subject[:140].rstrip(" .,") + "…"
-        return f"{ref}: {subject}"
+    body = re.sub(r"\bTRIGGER NOTAM\b\s*-?\s*", " ", text, flags=re.I)
+    body = re.sub(r"\bAIRAC\b", " ", body, flags=re.I)
+    body = _REF.sub(" ", body)
+    body = re.sub(r"\bSUBJECT\b\s*:?\s*", " ", body, flags=re.I)
+
+    keep = []
+    for seg in re.split(r"\.\s+|\n", body):
+        seg = seg.strip(" -.:")
+        if not seg or _BARE_PHASE.fullmatch(seg.upper()):
+            continue
+        if any(k in seg.upper() for k in _BOILER):
+            continue
+        keep.append(seg)
+
+    content = " ".join(keep).strip(" -.:")
+    if content:
+        if len(content) > 140:
+            content = content[:140].rstrip(" .,") + "…"
+        return f"{ref}: {content}"
 
     ph = _PHASE.search(text)
     tail = f", Phase {ph.group(1)}" if ph else ""
