@@ -28,16 +28,20 @@ from notam import cache
 from notam.timing import parse_notam_dt
 
 _SYSTEM = (
-    "Rewrite one aviation NOTAM as a single terse line for a professional pilot. "
-    "Keep standard aviation shorthand and units exactly as pilots read them — RWY, "
-    "TWY, ILS, VOR, DME, FT, NM, MHz, kHz, AMSL, AGL, U/S — do NOT spell them out "
-    "into words. State only the operational fact: what is affected, where, and any "
-    "altitude / distance / time limits. Drop filler and courtesy words. Do not "
-    "repeat the airport name (the briefing is already grouped by airport). No preamble."
+    "Rewrite one aviation NOTAM as the shortest possible line for a professional "
+    "pilot — a few words where you can. Keep aviation shorthand and units as pilots "
+    "read them (RWY, ILS, VOR, DME, FT, NM, MHz, AMSL, U/S); do not spell them out.\n"
+    "SAFETY-CRITICAL: copy every number, coordinate, frequency and UNIT exactly as "
+    "the source writes them. NEVER convert feet<->metres, never round, never relabel "
+    "a unit. If the source gives metres keep metres; if feet keep feet; if it gives "
+    "both, keep both.\n"
+    "Keep only operational essentials: what is affected, where, key limits "
+    "(altitude/distance), and active times. Drop filler and the airport name (the "
+    "briefing is already grouped by airport). No preamble."
 )
 
 # Bump this when the prompt/style changes, so old cached summaries are re-made.
-_STYLE = "2"
+_STYLE = "3"
 
 
 def summarise(notam: dict) -> str:

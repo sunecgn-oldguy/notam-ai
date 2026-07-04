@@ -168,3 +168,7 @@ NOTAM AI/
   (2) mærkat flyttet *over* NOTAM-teksten så teksten får fuld bredde (`web/index.html`);
   (3) AI-prompt strammet — behold luftfarts-forkortelser/units (MHz, NM, AMSL…), skær fyld,
   gentag ikke lufthavnsnavn. Cache-nøgle fik en `_STYLE`-version så gamle gavmilde svar erstattes.
+- **⚠️ Sikkerhedsfejl fanget af pilot (units):** AI skrev fx `79FT` hvor kilden vist havde
+  `…(79.37M)` — dvs. tog meter-tallet og satte FT på. Prompt hærdet: kopiér tal + UNITS ordret,
+  **aldrig** konvertér ft↔m, aldrig relabel. Også presset mod “kortest muligt”. `_STYLE` → "3".
+  (Bekræfter værdien af at have den rå NOTAM ét tryk væk.) TODO: verificér på den konkrete NOTAM.
