@@ -89,6 +89,13 @@
   function codes(raw){return raw.split(/[\s,.]+/).map(function(s){return s.trim().toUpperCase();}).filter(Boolean).join(' ');}
   function esc(s){return (s||'').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
 
+  // Collapsed group with each NOTAM's full original text (no AI).
+  function foldRaw(title, items){
+    if(!items || !items.length) return '';
+    var body = items.map(function(n){ return '<pre class="raw">'+esc(n.raw)+'</pre>'; }).join('');
+    return '<details class="fold"><summary>'+title+' <span class="cnt">'+items.length+'</span></summary>'+body+'</details>';
+  }
+
   var out=document.getElementById('out'), status=document.getElementById('status'), note=document.getElementById('note'), btn=document.getElementById('go');
 
   function render(data){
@@ -101,9 +108,7 @@
           '<div class="line">'+esc(r.summary)+'</div>'+
           '</summary><pre class="raw">'+esc(r.raw)+'</pre></details>';
       }).join('');
-      var folds='';
-      if(a.military_ids.length) folds+='<details class="fold"><summary>Military — disregarded <span class="cnt">'+a.military_ids.length+'</span></summary><div class="ids">'+a.military_ids.join(' · ')+'</div></details>';
-      if(a.inactive_ids.length) folds+='<details class="fold"><summary>Outside your flight window <span class="cnt">'+a.inactive_ids.length+'</span></summary><div class="ids">'+a.inactive_ids.join(' · ')+'</div></details>';
+      var folds = foldRaw('Military — disregarded', a.military) + foldRaw('Outside your flight window', a.inactive);
       return '<div class="apthead"><span class="code">'+esc(a.icao)+'</span><span class="nm">'+esc(a.name)+'</span><span class="badge">'+esc(a.role)+'</span></div>'+
         '<div class="counts">'+c.raw+' raw · '+c.relevant+' relevant · '+(c.military+c.inactive)+' filtered</div>'+
         '<div class="card">'+(rel||'<div style="padding:12px 13px;color:var(--faint);font-size:13px">No relevant NOTAMs in your window.</div>')+'</div>'+folds;

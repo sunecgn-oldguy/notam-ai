@@ -38,10 +38,15 @@ def build(airports: list[tuple[str, str]],
             "counts": {"raw": len(notams), "relevant": len(high),
                        "military": len(low), "inactive": len(inactive)},
             "relevant": [_view(n) for n in high],
-            "military_ids": [n["id"] for n in low],
-            "inactive_ids": [n["id"] for n in inactive],
+            "military": [_raw_view(n) for n in low],
+            "inactive": [_raw_view(n) for n in inactive],
         })
     return {"airports": out}
+
+
+def _raw_view(n: dict) -> dict:
+    """id + full original text only — no AI spent on disregarded / out-of-window NOTAMs."""
+    return {"id": n["id"], "raw": n["raw"]}
 
 
 def _view(n: dict) -> dict:

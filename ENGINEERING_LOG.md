@@ -172,3 +172,8 @@ NOTAM AI/
   `…(79.37M)` — dvs. tog meter-tallet og satte FT på. Prompt hærdet: kopiér tal + UNITS ordret,
   **aldrig** konvertér ft↔m, aldrig relabel. Også presset mod “kortest muligt”. `_STYLE` → "3".
   (Bekræfter værdien af at have den rå NOTAM ét tryk væk.) TODO: verificér på den konkrete NOTAM.
+- **Fulde originaler i "military" og "outside flight window":** disse grupper viser nu hele den
+  rå NOTAM (ikke kun ID'et) — stadig **ingen AI** brugt på dem. `briefing.py` sender rå tekst
+  (`_raw_view`); web-siden folder dem ud som `<pre class="raw">`.
+- **Pilot-regel til TODO:** vises ⟺ aktiv på landingstidspunktet (kræver D)-parser); inaktive
+  hører i "outside flight window", og tider udelades for viste (underforstået aktive).
