@@ -213,3 +213,7 @@ NOTAM AI/
 - **AI spejler kildens ordform** (`_STYLE`→"9"): forkort ved at fjerne fyld, ikke ved at
   forkorte ord. Behold kildens forkortelser; opfind aldrig egne (kilde "MOVEMENT" → behold, ikke
   "Mvt"). Forkortelser med STORT. Pilot fandt AI opfandt "Mvt".
+- **Parallelisering + tråd-sikker cache:** FAA-hentninger (6 tråde) og AI-oversættelser
+  (8 tråde) kører nu samtidig i `briefing.py`. Cachen er in-memory + lås + atomisk disk-skrivning
+  (`cache.py`) — 33 samtidige skrivninger uden korruption. AI-delen forventes ~30 s → ~5 s.
+  (Kold-start-dvale på gratis-plan er separat; løses med keep-alive/betalt.)
