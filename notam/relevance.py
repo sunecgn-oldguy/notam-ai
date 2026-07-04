@@ -25,11 +25,22 @@ _Q_GROUPS: dict[str, str] = {
     "M": "Runway / movement",
     "N": "Navaids",
     "O": "Other",
-    "P": "ATC procedures",
+    "P": "Procedures",
     "R": "Airspace restr.",
     "S": "ATS services",
     "W": "Warnings",
     "X": "Other",
+}
+
+# Finer labels for common 2-letter Q-code subjects (checked before the group).
+_Q_SUBJECT: dict[str, str] = {
+    "PA": "Arrival",
+    "PD": "Departure",
+    "PH": "Holding",
+    "PI": "Approach",
+    "PM": "Minima",
+    "PO": "Approach minima",
+    "PU": "Missed approach",
 }
 
 # Default flight context. Overridable — this is the one place to change policy.
@@ -44,7 +55,8 @@ def category(notam: dict) -> str:
     q = notam.get("qline")
     if not q or not q["q_subject"]:
         return "Unknown"
-    return _Q_GROUPS.get(q["q_subject"][0], "Other")
+    sub = q["q_subject"]
+    return _Q_SUBJECT.get(sub, _Q_GROUPS.get(sub[0], "Other"))
 
 
 def _is_military(notam: dict) -> bool:

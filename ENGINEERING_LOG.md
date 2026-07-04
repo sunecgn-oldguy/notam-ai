@@ -180,3 +180,8 @@ NOTAM AI/
 - **Rækkefølge-fix (grupper):** militær tjekkes nu FØR tid, så al militær havner i
   "Military — disregarded" (aktiv eller ej). "Outside window" indeholder kun civile inaktive.
   Pilot fandt P5587 (BUNDESWEHR/ETNK, FAA=MILITARY) forkert i outside window.
+- **Bedre kategorier + kortere tabeller (pilot):** "P"-gruppen omdøbt fra vildledende
+  "ATC procedures" til præcise labels via 2-bogstavs Q-subject (QPO→"Approach minima",
+  QPD→"Departure", QPI→"Approach"…). AI-prompt: transskribér IKKE tabeller (minima pr. RWY,
+  koordinatlister) — giv kernen ("LPV minima raised, all RWYs"), tal bliver i originalen.
+  `_STYLE`→"4".
