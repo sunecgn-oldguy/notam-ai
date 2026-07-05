@@ -62,6 +62,7 @@ Telefon   →  brugerens ruter (lokalt + iCloud). Forlader aldrig enheden.
 | D15 | **Deterministisk-først for struktureret data** | Kategori, triggers, tider, vejr = kode (aldrig AI). AI kun til fri-tekst NOTAM-sprog. Krymper hallucination-fladen. |
 | D16 | **Gemte ruter = frø i frontenden + on-device-redigering (ingen login)** | Starair-ruterne bages ind som `DEFAULT_ROUTES` (frø); hver enheds egne tilføjelser/sletninger gemmes i browserens `localStorage` og lægger sig ovenpå — realiserer D11's on-device-model for web. Ingen konti/database/server-state; dataen forlader aldrig enheden. Login er kun nødvendigt ved cross-device på fremmede enheder, server-side deling eller central styring (senere, offentligt-app-problem — bringer også auth + GDPR). iCloud-sync kommer gratis i iOS-appen. Bemærk: `data/` er gitignored → deploy-data bages ind i `notam/` eller `web/`. |
 | D17 | **Bane-i-brug = deterministisk vind-favorit (OurAirports)** | Baner + retvisende heading fra OurAirports (samme kilde/licens som IATA→ICAO). METAR-vind er også retvisende → ren geometri (headwind-komponent), ingen AI, ingen magnetisk misvisning. Kun et *hint*: støj/preferential/ILS/ATC afgør bane-i-brug — UI siger det. Calm/VRB/<3 kt → intet valg. |
+| D18 | **Skalerings-arkitektur: ingest → DB, eager på gemte ruter, lazy resten** | Fetch-per-request skalerer ikke (to pres: tid + tokens). Ved vækst: baggrunds-ingestion (poll → senere SWIM) fylder en database; pilot-kald serveres derfra (millisekunder, ingen live-fetch). Adskil de to omkostninger: **hente NOTAMs = gratis** (hent alt regelmæssigt) vs **AI = tokens** (eager kun på de gemte ruters pladser — lille/kendt/billigt; lazy for ad-hoc-pladser). Tokens ∝ ændringsrate, ikke trafik; prompt caching ~10%. Migrering er *påbygning*: den deterministiske pipeline + content-cache er allerede adskilt fra AI. Fuld plan + faser i §6. |
 
 ---
 
@@ -162,6 +163,60 @@ NOTAM AI/
 - **Kosmetik/valg:** "CAVOK"-badge dækker hele grøn-tieren (ikke kun literal CAVOK); Departure ligger
   i "rest" i sorteringen (pilot kan ønske højere); blandet casing i AI-linjer (kilde=STORT, udvidelser=små).
 - ~~Fuld IATA→ICAO~~ · ~~server/live~~ · ~~D)-parser~~ · ~~vejr~~ · ~~token-tæller~~ · ~~sammenfoldelige AD~~ ✅ løst.
+
+### Fase 2-plan — skalering: ingest → database (D18)
+
+**Problemet:** nuværende model henter live fra FAA *ved hvert kald*. Med mange piloter der spørger
+til overlappende pladser hentes samme data igen og igen (langsomt + hårdt ved FAA). To pres: **tid** og
+**tokens**.
+
+**Nøgle-indsigt: skil de to omkostninger ad.**
+
+| Trin | Koster | Skalerer med |
+|------|--------|--------------|
+| Hente + parse NOTAMs | CPU + netværk (≈ gratis) | antal pladser |
+| AI-oversætte | **tokens (de eneste rigtige penge)** | antal *nye/ændrede* NOTAMs |
+
+**Arkitektur (to afkoblede dele):**
+
+```
+INGESTION (baggrund, uafhængig af trafik)
+  hvert ~15-30 min:  hent NOTAMs for alle kendte pladser  →  parse (Q/kategori/tid/D)
+                     →  AI-oversæt de NYE/ændrede  →  gem i DB
+        │
+        ▼
+   [ Database ]  ← altid opdateret, altid klar
+        ▲
+        │
+SERVING (pr. pilot-kald, millisekunder)
+  slå pladser op i DB  →  filtrér på pilotens tidsvindue (deterministisk, billigt)  →  returnér
+```
+
+**AI-strategi (løser token-presset):** hent ALT regelmæssigt (gratis), men vær selektiv med tokens:
+- **Eager** kun på pladserne i de **gemte ruter** (lille, kendt sæt, kæmpe overlap) → nul ventetid,
+  næsten nul tokens. Grov regning: ~200–400 AI-berettigede NOTAMs × ~0,1 øre ≈ få kr. at fylde én gang,
+  derefter kun *ændringer* (få øre/dag). Militær/inaktiv/trigger koster allerede 0 (deterministisk).
+- **Lazy** for ad-hoc-pladser en pilot taster → brænd ikke tokens på noget ingen ser.
+- Skalerer: så længe "eager-sættet" (∑ gemte ruter) er afgrænset, forbliver det billigt.
+
+**Token-håndtag:** (1) tokens ∝ *ændringsrate*, ikke request-rate — steady-state er billigt; opdaterings-
+frekvens = token-drejeknap. (2) prompt caching af system-prompten (~10% på gentagne kald, ~5–10× på input).
+
+**Faser:**
+
+| Fase | Brugere | Løsning |
+|------|---------|---------|
+| **Nu** | få | fetch-på-kald + content-cache + parallelisme (16/16) + Render $7 (altid-varm) |
+| **Vækst** | snesevis–hundreder | scheduled poll → **Render managed Postgres**; servér fra DB; eager-på-gemte-ruter |
+| **Skala** | tusinder / kommercielt | **FAA SWIM** streaming (realtid push) + flere server-instanser |
+
+**Migrering = påbygning, ikke omskrivning:** ingestion-jobbet genbruger *præcis* `enrich`/`classify`/
+`summarise` og skriver til DB i stedet for at returnere; serve-delen genbruger `timing.is_active_during`
++ D)-skema oven på gemte data. Vejr (METAR/TAF) holdes separat med kort TTL (ændrer sig tit, let at hente).
+
+**DB-skitse (Postgres):** `notams(id, icao, raw, q_* felter, category, valid_from, valid_to, d_field,
+ai_summary, hash, status[active/replaced/cancelled], fetched_at)` + `weather(icao, metar, taf, fetched_at)`.
+NOTAM-livscyklus: NOTAMR erstatter, NOTAMC annullerer → markér status ved hver ingest-cyklus.
 
 ---
 
@@ -315,3 +370,8 @@ NOTAM AI/
   "· tap to fill · press Edit to modify routes". Vindue-noten over ETD/EET er nu en **statisk, fed, mørk**
   opfordring — **"Set times to get correctly tailored WX and NOTAM"** — i stedet for den live ETD→ETA-
   readout; den tilhørende `updateWinnote`/`eta`-JS er fjernet (nettoresultat −26 linjer, koden blev simplere).
+- **Parallelisme-bump + Fase 2-plan:** fetch/AI-pools hævet 6/8 → **16/16** i `briefing.py` (I/O-bundet,
+  billige tråde → hele ruten hentes i én bølge; barberer den varme tid). Skrevet **Fase 2-planen** ind
+  (D18 + §6): ingest → DB, eager-oversæt kun gemte-rute-pladser, lazy resten; token ∝ ændringsrate;
+  faser nu/vækst/skala. Baggrund: kold-start-test viste CGN–ATH 1:20 (kold) vs ~25s (varm) — Render $7
+  fjerner de ~50s kold-start; parallelisme + cache tager den varme tid videre ned.
