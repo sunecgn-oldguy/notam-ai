@@ -21,8 +21,12 @@ from notam.llm import summarise
 from notam.relevance import classify, priority
 from notam.timing import is_active_during, parse_notam_dt
 
-_FETCH_WORKERS = 6
-_AI_WORKERS = 8
+# Both pools are I/O-bound (waiting on FAA / aviationweather / the Claude API),
+# so extra threads are cheap and cut wall-clock on multi-airport routes — a whole
+# route fans out at once instead of in waves. Kept moderate to be gentle on the
+# upstream sources (avoid rate-limiting).
+_FETCH_WORKERS = 16
+_AI_WORKERS = 16
 
 
 def build(airports: list[tuple[str, str]],
