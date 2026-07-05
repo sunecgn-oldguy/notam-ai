@@ -60,6 +60,8 @@ Telefon   →  brugerens ruter (lokalt + iCloud). Forlader aldrig enheden.
 | D13 | **Hosting: Render** (start på free-tier) | suneg har ingen fast IP, manuel genstart ved strømudfald, væk ~50% af tiden → managed host frem for hjemmeserver. Serveren er let (AI kører hos Anthropic), så billigste plan er nok. Nøgle bor i Renders miljøvariabler. |
 | D14 | **Vejr-kilde: aviationweather.gov** | Gratis, ingen nøgle, global METAR/TAF (US NWS). Samme filosofi som FAA. |
 | D15 | **Deterministisk-først for struktureret data** | Kategori, triggers, tider, vejr = kode (aldrig AI). AI kun til fri-tekst NOTAM-sprog. Krymper hallucination-fladen. |
+| D16 | **Gemte ruter = statisk delt liste i frontenden (ingen login)** | Appen er (nu) til pilot + kollegaer på samme ruter → én delt liste bagt ind i `index.html` (`ROUTES`-array), redigeres + pushes. Ingen konti/database/per-bruger-state. Login + egne ruter er et *senere* offentligt-app-problem (jf. D11's iOS-vision). Betal ikke for kompleksitet der ikke bruges endnu. Bemærk: `data/` er gitignored → data der skal deployes bages ind i `notam/` eller `web/`. |
+| D17 | **Bane-i-brug = deterministisk vind-favorit (OurAirports)** | Baner + retvisende heading fra OurAirports (samme kilde/licens som IATA→ICAO). METAR-vind er også retvisende → ren geometri (headwind-komponent), ingen AI, ingen magnetisk misvisning. Kun et *hint*: støj/preferential/ILS/ATC afgør bane-i-brug — UI siger det. Calm/VRB/<3 kt → intet valg. |
 
 ---
 
@@ -85,22 +87,25 @@ API: `POST /briefing`, `GET /health`, `GET /usage`. Env på Render: `ANTHROPIC_A
 | 5. AI-lag (none/claude/qwen) | `notam/llm.py` | ✅ live (Haiku) |
 | Cache (content-addr., tråd-sikker) | `notam/cache.py` | ✅ |
 | Token-tæller (udbyder-agnostisk) | `notam/usage.py` | ✅ (`/usage`) |
-| Vejr: METAR/TAF + 4 farvekategorier | `notam/weather.py` | ✅ (17 tests, TAF-prognose) |
+| Vejr: METAR/TAF + 4 farvekategorier + vind | `notam/weather.py` | ✅ (19 tests, TAF-prognose) |
+| Baner + vind-favoriseret ende | `notam/runways.py` + `runways.json` | ✅ (17 tests, OurAirports) |
 | Briefing (parallel fetch+AI) | `notam/briefing.py` | ✅ |
 | HTTP-server | `server.py` | ✅ live |
 | Web-UI (mobil, vanilla) | `web/index.html` | ✅ live |
 | CLI | `main.py` | ⚠️ ikke opdateret med nyeste felter |
 
-**Live features:** DEP/ARR/ALT/ENR (IATA+ICAO), Today/Tomorrow + ETD/EET → vindue til ETA;
-sammenfoldelige lufthavne; NOTAMs sorteret ILS→Approach→Runway→Navaids→Movement→rest med alder
-(fx "3mo"); AI-omskrevne linjer + original ordret i dropdown; militær + outside-window i fuld
-original; vejr-badge (CAVOK/GOOD/MARGINAL/LOW VIS) fra TAF-prognosen i flyve-vinduet.
+**Live features:** ét-tryk **rute-chips** (delt crew-liste, ingen login); DEP/ARR/ALT/ENR (IATA+ICAO),
+Today/Tomorrow + ETD/EET → vindue til ETA; sammenfoldelige lufthavne; **bane-linje over vejret**
+(`RWY 06/24 · 13L/31R · …` + vind, vind-favoriseret ende fremhævet); NOTAMs sorteret
+ILS→Approach→Runway→Navaids→Movement→rest med alder (fx "3mo"); AI-omskrevne linjer + original
+ordret i dropdown; militær + outside-window i fuld original; vejr-badge
+(CAVOK/GOOD/MARGINAL/LOW VIS, hvor LOW VIS = Cat I-minima ≤550 m/200 ft) fra TAF-prognosen i flyve-vinduet.
 
 **AI-output-spec (i `llm.py` `_SYSTEM`, `_STYLE=9`):** spejl kildens ordform (udvid/forkort aldrig
 selv); behold direktiver ordret (DO NOT USE); kopiér tal+units ordret (aldrig konvertér ft↔m);
 opfind aldrig; drop validitetstider (vist ⟺ aktiv) + rå lat/long; tabeller → kun kernen.
 
-**Tests:** `python3 test_schedule.py` / `test_triggers.py` / `test_weather.py` (alle grønne).
+**Tests:** `python3 test_schedule.py` / `test_triggers.py` / `test_weather.py` / `test_runways.py` (alle grønne).
 **Deploy:** push til GitHub (sunecgn-oldguy/notam-ai) → Render auto-deployer (kan pushes herfra;
 token i macOS-nøgleringen). Gratis-tier: kold-start ~30–50s efter dvale; cachen tømmes ved redeploy.
 
@@ -117,7 +122,8 @@ NOTAM AI/
   requirements.txt         flask, gunicorn, anthropic
   DEPLOY_RENDER.md         deploy-guide
   ENGINEERING_LOG.md       dette dokument
-  web/index.html           mobil web-UI (vanilla HTML/CSS/JS)
+  web/index.html           mobil web-UI (vanilla HTML/CSS/JS) — inkl. gemte ruter (ROUTES-array)
+  tools/build_runways.py   bygger notam/runways.json fra OurAirports (reproducerbart)
   notam/
     faa.py                 trin 1 — hent rå NOTAMs (FAA) + HTML-afkod
     clean.py, abbreviations.py   trin 2 — rens + forkortelses-ordbog
@@ -129,11 +135,12 @@ NOTAM AI/
     llm.py                 trin 5 — udskifteligt AI-lag (none/claude/qwen) + prompt-spec
     cache.py               content-addressed, tråd-sikker cache
     usage.py               udbyder-agnostisk token-tæller
-    weather.py             METAR/TAF + 4 farvekategorier (TAF-prognose i vinduet)
+    weather.py             METAR/TAF + 4 farvekategorier (TAF-prognose i vinduet) + vindparser
+    runways.py, runways.json   baner pr. ICAO + vind-favoriseret ende (OurAirports, 33.7k AD)
     airports.py, iata_icao.json   IATA→ICAO (8471 koder)
     profile.py             lufthavns-DB + presets
     briefing.py            samler hele kæden (parallel fetch + AI)
-  test_schedule.py, test_triggers.py, test_weather.py   tests
+  test_schedule.py, test_triggers.py, test_weather.py, test_runways.py   tests
   data/                    (gitignored) presets, notam_cache, m.m.
 ```
 
@@ -270,3 +277,22 @@ NOTAM AI/
   flight window — <day>, ETD …Z → ETA …Z" (ETA beregnet i UI). Ingen fuld dato nødvendig; TAF
   dækker i dag/i morgen.
 - **Today/Tomorrow-vælger + vindue-note** tilføjet (server `day`-param, UI viser ETD→ETA). Log opdateret til live-tilstand (status/filoversigt/beslutninger D14–D15/åbne punkter) før auto-compact.
+
+### 2026-07-05 — Minima, ruter, baner
+- **LOW VIS = Cat I-minima (pilot):** vejr-tærsklen for rød ændret fra 1 km/500 ft til **≤550 m RVR /
+  ≤200 ft** (`weather._classify`). Rammer nu "på/under minima" i stedet for at farve et moderat loft
+  rødt — fx `BKN004` (400 ft) med 10 km sigt er nu MARGINAL, ikke LOW VIS. Løser samtidig et navne-
+  problem: "LOW VIS" betød tidligere også lavt loft. MARGINAL-båndet strækker sig nu ned til minima.
+  Testene opdateret + kant-cases tilføjet (200 ft/500 m rammer rødt; 300–400 ft er MARGINAL) → 19 tests.
+- **Gemte ruter — ét-tryk-chips (pilot):** vandret chip-række øverst i formularen (`web/index.html`,
+  `ROUTES`-array). Ét tryk udfylder DEP/ARR/ENR; pilot sætter dag + ETD og trykker Get briefing
+  (tidsvinduet kan ikke gættes → ikke auto-hent). Delt statisk crew-liste, **ingen login** (D16).
+  Enroute-koder der allerede flyves som dep/arr fjernes → ingen dobbelt-hentning. 10 CGN-ruter lagt ind;
+  alle 43 IATA-koder verificeret → ICAO; to slåfejl rettet: `NTS→NTE` (Nantes), `DVB→DBV` (Dubrovnik).
+- **Baner over vejret + vind-favoriseret ende (pilot):** `notam/runways.json` (OurAirports, public
+  domain, 33.709 AD, keyet på ICAO — samme kilde som IATA→ICAO), bygget reproducerbart via
+  `tools/build_runways.py`; ingen runtime-download. `notam/runways.py` slår baner op og markerer den
+  ende der er mest op i vinden (D17). `weather._wind` parser METAR-vind (dir/speed/gust, MPS→kt,
+  360=nord, VRB/calm → ingen retning). UI viser en linje over vejret: `RWY 06/24 · 13L/31R · 13R/31L
+  wind 280/12` med den vind-favoriserede ende fremhævet + caveat (støj/ILS/ATC afgør). 17 nye tests
+  (`test_runways.py`). Headings og METAR-vind er begge retvisende → ingen magnetisk misvisning.
