@@ -3,7 +3,9 @@
 Run:  python3 test_weather.py
 """
 
-from notam.weather import _classify, _ceiling_ft, _visibility_m
+from datetime import datetime, timezone
+
+from notam.weather import _classify, _ceiling_ft, _visibility_m, taf_category
 
 
 def cat(metar: str):
@@ -31,7 +33,35 @@ for metar, expected in CASES:
     ok = got == expected
     if not ok:
         fails += 1
-    print(f"[{'ok' if ok else 'FAIL'}] {expected:9} <- got {got!r:11}  ({metar[:44]}…)")
+    print(f"[{'ok' if ok else 'FAIL'}] METAR {expected:9} <- got {got!r:11}  ({metar[:40]}…)")
+
+
+def win(day, h1, mi1, h2, mi2):
+    return (datetime(2026, 7, day, h1, mi1, tzinfo=timezone.utc),
+            datetime(2026, 7, day, h2, mi2, tzinfo=timezone.utc))
+
+
+TAF_CAVOK = "TAF EDDK 041700Z 0418/0524 30015G25KT CAVOK BECMG 0418/0421 29008KT TEMPO 0422/0505 23004KT"
+TAF_TEMPO = "TAF LFML 050500Z 0506/0612 27010KT 9999 SCT035 TEMPO 0510/0514 3000 BKN008"
+TAF_FM = "TAF EGLL 050000Z 0500/0606 25008KT CAVOK FM051000 20008KT 2000 OVC004"
+TAF_BECMG = "TAF LSZH 050000Z 0500/0606 24006KT CAVOK BECMG 0512/0514 6000 BKN020"
+
+TAF_CASES = [
+    ("all-CAVOK, wind-only changes",  TAF_CAVOK, win(5, 8, 0, 9, 30), "CAVOK"),
+    ("TEMPO deterioration hits",      TAF_TEMPO, win(5, 12, 0, 13, 0), "MARGINAL"),
+    ("before the TEMPO",              TAF_TEMPO, win(5, 7, 0, 8, 0), "CAVOK"),
+    ("after an FM (permanent bad)",   TAF_FM, win(5, 11, 0, 12, 0), "LOW VIS"),
+    ("before the FM",                 TAF_FM, win(5, 8, 0, 9, 0), "CAVOK"),
+    ("after a BECMG",                 TAF_BECMG, win(5, 15, 0, 16, 0), "GOOD"),
+    ("before the BECMG",              TAF_BECMG, win(5, 5, 0, 5, 30), "CAVOK"),
+]
+
+for name, taf, window, expected in TAF_CASES:
+    got = taf_category(taf, *window)
+    ok = got == expected
+    if not ok:
+        fails += 1
+    print(f"[{'ok' if ok else 'FAIL'}] TAF   {expected:9} <- got {got!r:11}  ({name})")
 
 print()
 print("ALL PASSED" if fails == 0 else f"{fails} FAILED")

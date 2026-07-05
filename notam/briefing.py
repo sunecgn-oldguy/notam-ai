@@ -59,7 +59,7 @@ def _process_airport(airport: tuple[str, str],
         "name": notams[0]["airport_name"] if notams else "",
         "notams": notams, "military": military, "high": high,
         "inactive": [n for n in civil if not n["active"]],
-        "weather": weather.fetch(icao),
+        "weather": weather.fetch(icao, window),
     }
 
 

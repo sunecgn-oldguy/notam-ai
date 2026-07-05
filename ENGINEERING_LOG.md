@@ -234,3 +234,7 @@ NOTAM AI/
   CAVOK (grøn) / GOOD (blå) / MARGINAL (amber) / LOW VIS (rød) — pilotens tærskler, værste af
   sigt/base afgør. 10 tests (`test_weather.py`). Hentes parallelt pr. AD i `briefing.py`; vises som
   farvet badge på lufthavns-overskriften + Weather-dropdown med rå METAR/TAF.
+- **Vejr-farve fra TAF (prognose i flyve-vinduet):** `weather.taf_category()` fortolker TAF'en
+  (validitet, FM/BECMG med carry-forward af sigt/skybase, TEMPO/PROB) og tager **værste kategori**
+  i [ETD, ankomst]. METAR er fallback. Badge = prognose; dropdown viser "Now X · At ETD Y". 7 nye
+  TAF-tests. Projektets mest komplekse parser — men isoleret i `weather.py` og testet.
