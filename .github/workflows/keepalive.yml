@@ -1,0 +1,27 @@
+name: keep-alive
+
+# Keeps the free Render service from spinning down (it sleeps after ~15 min with
+# no inbound traffic, which causes the ~30-50s cold start). An external GET to
+# /health both resets the idle timer and wakes it if it has already slept.
+#
+# GitHub's scheduler is best-effort and can add a few minutes of jitter, so we
+# ping every ~10 min to stay safely under the 15-min sleep threshold. If the odd
+# cold start still slips through, add a dedicated pinger (e.g. UptimeRobot, free,
+# 5-min checks) pointed at the same URL — more precise timing than cron here.
+#
+# Free + unlimited because the repo is public. Runs only from the default branch.
+# GitHub disables scheduled workflows after 60 days of repo inactivity.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # every 10 minutes (UTC), best-effort
+  workflow_dispatch: {}        # allow a manual run from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: |
+          curl -fsS --max-time 90 https://notam-ai.onrender.com/health \
+            && echo " — service awake"
