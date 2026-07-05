@@ -171,7 +171,7 @@
     return '<details class="fold"><summary>'+title+' <span class="cnt">'+items.length+'</span></summary>'+body+'</details>';
   }
 
-  var WXCLASS = {"CAVOK":"wx-green","GOOD":"wx-blue","MARGINAL":"wx-amber","LOW VIS":"wx-red"};
+  var WXCLASS = {"CAVOK":"wx-green","GOOD":"wx-green","OK":"wx-blue","MARGINAL":"wx-amber","LOW VIS":"wx-red"};
   function wxBadge(w){
     if(!w || !w.category) return '';
     return '<span class="wxbadge '+(WXCLASS[w.category]||'')+'">'+esc(w.category)+'</span>';

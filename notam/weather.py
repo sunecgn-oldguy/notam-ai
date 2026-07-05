@@ -8,9 +8,11 @@ The badge colour reflects the FORECAST during the flight window (the worst
 category a TAF period predicts while you're there); it falls back to the current
 METAR when there is no usable TAF.
 
-Categories (the WORSE of visibility / ceiling decides), per the pilot's spec:
-  CAVOK     green   — CAVOK, or vis >= 10 km AND ceiling >= 5000 ft
-  GOOD      blue    — vis >= 5 km   AND ceiling >= 1500 ft
+Categories (the WORSE of visibility / ceiling decides). CAVOK is shown ONLY when
+the report literally says CAVOK; good-but-not-CAVOK conditions read GOOD.
+  CAVOK     green   — the report literally says CAVOK
+  GOOD      green   — vis >= 10 km  AND ceiling >= 5000 ft (but not a reported CAVOK)
+  OK        blue    — vis >= 5 km   AND ceiling >= 1500 ft
   MARGINAL  amber   — vis > 550 m   AND ceiling > 200 ft
   LOW VIS   red     — at/below Cat I minima (vis <= 550 m OR ceiling <= 200 ft)
 """
@@ -32,7 +34,7 @@ _MARKER = re.compile(r"\b(FM\d{6}|BECMG|TEMPO|PROB\d{2})\b")
 _HAS_VIS = re.compile(r"\b(\d{4}(?:NDV)?|\d+/\d+SM|\d+SM|CAVOK)\b")
 _HAS_CLOUD = re.compile(r"\b(?:FEW|SCT|BKN|OVC|VV|SKC|NSC|NCD|CLR)\d*\b")
 _WIND = re.compile(r"\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?(KT|MPS)\b")
-_SEVERITY = {"CAVOK": 0, "GOOD": 1, "MARGINAL": 2, "LOW VIS": 3}
+_SEVERITY = {"CAVOK": 0, "GOOD": 1, "OK": 2, "MARGINAL": 3, "LOW VIS": 4}
 
 
 def fetch(icao: str, window: tuple | None = None) -> dict:
@@ -146,7 +148,7 @@ def _ddhh(dd: str, hh: str, ref: datetime):
 
 def _classify(cavok: bool, vis_m: int | None, ceil_ft: int | None):
     if cavok:
-        return "CAVOK"
+        return "CAVOK"                # ONLY when the report literally says CAVOK
     if vis_m is None and ceil_ft is None:
         return None
     v = vis_m if vis_m is not None else 99999
@@ -156,8 +158,8 @@ def _classify(cavok: bool, vis_m: int | None, ceil_ft: int | None):
     if v < 5000 or c < 1500:
         return "MARGINAL"
     if v < 10000 or c < 5000:
-        return "GOOD"
-    return "CAVOK"
+        return "OK"
+    return "GOOD"                     # good VMC by the numbers — but not a reported CAVOK
 
 
 def _visibility_m(metar: str) -> int | None:
