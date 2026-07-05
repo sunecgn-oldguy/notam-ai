@@ -5,7 +5,8 @@ Run:  python3 test_weather.py
 
 from datetime import datetime, timezone
 
-from notam.weather import _classify, _ceiling_ft, _visibility_m, taf_category
+from notam.weather import (_classify, _ceiling_ft, _visibility_m, _wind_kt,
+                           taf_category, taf_windy)
 
 
 def cat(metar: str):
@@ -64,6 +65,31 @@ for name, taf, window, expected in TAF_CASES:
     if not ok:
         fails += 1
     print(f"[{'ok' if ok else 'FAIL'}] TAF   {expected:9} <- got {got!r:11}  ({name})")
+
+# --- windy flag (> 20 kt steady OR gust, in the flight window) ---
+TAF_WINDY = "TAF EGLL 050000Z 0500/0606 18012KT CAVOK BECMG 0508/0510 22026G38KT FM051500 27010KT"
+
+WINDY_CASES = [
+    ("gusty BECMG in window",  TAF_WINDY, win(5, 12, 0, 13, 0), True),   # 26G38 -> windy
+    ("before the gusty BECMG", TAF_WINDY, win(5, 6, 0, 7, 0),  False),   # base 12 kt
+    ("after FM drops the wind", TAF_WINDY, win(5, 16, 0, 17, 0), False),  # 10 kt
+    ("light wind whole TAF",   TAF_CAVOK, win(5, 8, 0, 9, 30), False),   # 8 kt in window
+]
+
+for name, taf, window, expected in WINDY_CASES:
+    got = taf_windy(taf, *window)
+    ok = got == expected
+    if not ok:
+        fails += 1
+    print(f"[{'ok' if ok else 'FAIL'}] WINDY {str(expected):9} <- got {got!r:11}  ({name})")
+
+# _wind_kt: steady vs gust, calm, none
+for text, exp in [("22026G38KT", 38), ("18012KT", 12), ("00000KT", 0), ("9999 SCT035", None)]:
+    got = _wind_kt(text)
+    ok = got == exp
+    if not ok:
+        fails += 1
+    print(f"[{'ok' if ok else 'FAIL'}] WINDKT {str(exp):9} <- got {got!r:11}  ({text})")
 
 print()
 print("ALL PASSED" if fails == 0 else f"{fails} FAILED")

@@ -35,6 +35,7 @@ _HAS_VIS = re.compile(r"\b(\d{4}(?:NDV)?|\d+/\d+SM|\d+SM|CAVOK)\b")
 _HAS_CLOUD = re.compile(r"\b(?:FEW|SCT|BKN|OVC|VV|SKC|NSC|NCD|CLR)\d*\b")
 _WIND = re.compile(r"\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?(KT|MPS)\b")
 _SEVERITY = {"CAVOK": 0, "GOOD": 1, "OK": 2, "MARGINAL": 3, "LOW VIS": 4}
+_WINDY_KT = 20                               # steady or gust above this flags "Windy"
 
 
 def fetch(icao: str, window: tuple | None = None) -> dict:
@@ -45,11 +46,15 @@ def fetch(icao: str, window: tuple | None = None) -> dict:
     up = metar.upper()
     metar_cat = _classify("CAVOK" in up, _visibility_m(up), _ceiling_ft(up))
     taf_cat = taf_category(taf, window[0], window[1]) if window else None
+    wind = _wind(up)
+    windy = max(wind["speed"], wind["gust"] or 0) > _WINDY_KT      # METAR now
+    if window and taf_windy(taf, window[0], window[1]):            # or TAF in the window
+        windy = True
     return {
         "metar": metar, "taf": taf,
         "metar_category": metar_cat, "taf_category": taf_cat,
         "category": taf_cat or metar_cat,
-        "wind": _wind(up),
+        "wind": wind, "windy": windy,
     }
 
 
@@ -69,18 +74,42 @@ def _wind(metar: str) -> dict:
     }
 
 
+def _wind_kt(text: str):
+    """Max wind (steady or gust) in kt from a wind group in text, or None if the
+    text has no wind group at all (so callers can carry the previous wind forward)."""
+    if not _WIND.search(text):
+        return None
+    w = _wind(text)
+    return max(w["speed"], w["gust"] or 0)
+
+
 def taf_category(taf: str, ws: datetime, we: datetime):
     """Worst forecast category during [ws, we], or None if unparseable."""
+    cats = [c for c in (_classify(cav, vis, ceil)
+                        for cav, vis, ceil, _ in _taf_conditions(taf, ws, we)) if c]
+    return max(cats, key=lambda c: _SEVERITY[c]) if cats else None
+
+
+def taf_windy(taf: str, ws: datetime, we: datetime) -> bool:
+    """True if any in-window TAF period forecasts wind (steady or gust) > 20 kt."""
+    return any(w is not None and w > _WINDY_KT
+               for _, _, _, w in _taf_conditions(taf, ws, we))
+
+
+def _taf_conditions(taf: str, ws: datetime, we: datetime):
+    """Per-period (cavok, vis_m, ceil_ft, wind_kt) for every TAF period that
+    overlaps [ws, we]. vis/ceiling/wind carry forward through changes that don't
+    restate them; wind_kt = max(steady, gust). [] if the TAF can't be parsed."""
     if not taf:
-        return None
+        return []
     up = " ".join(taf.upper().split())
     v = _PERIOD.search(up)
     if not v:
-        return None
+        return []
     valid_start = _ddhh(v.group(1), v.group(2), ws)
     valid_end = _ddhh(v.group(3), v.group(4), ws)
     if valid_start is None or valid_end is None:
-        return None
+        return []
 
     body = up[v.end():]
     marks = list(_MARKER.finditer(body))
@@ -107,10 +136,10 @@ def taf_category(taf: str, ws: datetime, we: datetime):
             elif ps and pe:                  # TEMPO / PROB
                 temps.append((ps, pe, cond))
 
-    cats = []
-    # permanent timeline, carrying visibility/ceiling forward through wind-only changes
+    out = []
+    # permanent timeline, carrying vis/ceiling/wind forward through partial changes
     perms = sorted((p for p in perms if p[0] is not None), key=lambda p: p[0])
-    cav, vis, ceil = False, None, None
+    cav, vis, ceil, wind = False, None, None, None
     for j, (start, text) in enumerate(perms):
         if "CAVOK" in text:
             cav, vis, ceil = True, 10000, None
@@ -119,16 +148,18 @@ def taf_category(taf: str, ws: datetime, we: datetime):
                 cav, vis = False, _visibility_m(text)
             if _HAS_CLOUD.search(text):
                 cav, ceil = False, _ceiling_ft(text)
+        wk = _wind_kt(text)
+        if wk is not None:
+            wind = wk
         end = perms[j + 1][0] if j + 1 < len(perms) else valid_end
         if start < we and end > ws:          # overlaps the flight window
-            cats.append(_classify(cav, vis, ceil))
+            out.append((cav, vis, ceil, wind))
 
-    for ps, pe, text in temps:               # temporary deteriorations in the window
+    for ps, pe, text in temps:               # temporary deviations in the window
         if ps < we and pe > ws:
-            cats.append(_classify("CAVOK" in text, _visibility_m(text), _ceiling_ft(text)))
-
-    cats = [c for c in cats if c]
-    return max(cats, key=lambda c: _SEVERITY[c]) if cats else None
+            out.append(("CAVOK" in text, _visibility_m(text),
+                        _ceiling_ft(text), _wind_kt(text)))
+    return out
 
 
 def _ddhh(dd: str, hh: str, ref: datetime):

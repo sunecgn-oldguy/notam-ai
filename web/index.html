@@ -77,7 +77,7 @@
   .empty2{padding:12px 13px;color:var(--faint);font-size:13px}
 
   /* weather — colour categories */
-  .wxbadge,.wxcat{font-size:10px;font-weight:700;letter-spacing:.05em;border-radius:5px;padding:2px 7px;border:1px solid;white-space:nowrap}
+  .wxbadge,.wxcat,.windy{font-size:10px;font-weight:700;letter-spacing:.05em;border-radius:5px;padding:2px 7px;border:1px solid;white-space:nowrap}
   .wx-green{color:#1f7a45;border-color:#2e8c50;background:rgba(46,140,80,.13)}
   .wx-blue{color:#0b4f97;border-color:#1a63bd;background:rgba(24,99,189,.20)}
   .wx-amber{color:#916012;border-color:#c8901e;background:rgba(200,140,20,.15)}
@@ -183,10 +183,11 @@
   function weatherBlock(w){
     if(!w) return '';
     var cat = w.category ? '<span class="wxcat '+(WXCLASS[w.category]||'')+'">'+esc(w.category)+'</span>' : '';
+    var windy = w.windy ? '<span class="windy wx-amber">Windy</span>' : '';
     var line = '<div class="wxline">Now '+wxPill(w.metar_category)+
                ' · At ETD '+wxPill(w.taf_category)+'</div>';
     var txt = (w.metar||'(no METAR available)')+'\n\n'+(w.taf||'(no TAF available)');
-    return '<details class="wx"><summary>Weather'+cat+'<span class="car">▸</span></summary>'+
+    return '<details class="wx"><summary>Weather'+windy+cat+'<span class="car">▸</span></summary>'+
            line+'<pre class="wxpre">'+esc(txt)+'</pre></details>';
   }
 
