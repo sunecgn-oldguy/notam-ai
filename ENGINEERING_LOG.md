@@ -310,3 +310,8 @@ NOTAM AI/
   (fallback til frø ved manglende/korrupt data) + try/catch om skrivning (privat-tilstand kan ikke crashe).
   Realiserer D11's on-device-model for web; iCloud-sync kommer gratis i iOS-appen. Logik verificeret
   (load→gem→genindlæs efter "genstart", slet, reset, dedup).
+- **Editor-finpudsning + statisk note:** "Save current as route" lukker nu redigeringen automatisk
+  (Done underforstået; sletning med × holder åben, så flere kan fjernes i træk). Rute-labelen udvidet til
+  "· tap to fill · press Edit to modify routes". Vindue-noten over ETD/EET er nu en **statisk, fed, mørk**
+  opfordring — **"Set times to get correctly tailored WX and NOTAM"** — i stedet for den live ETD→ETA-
+  readout; den tilhørende `updateWinnote`/`eta`-JS er fjernet (nettoresultat −26 linjer, koden blev simplere).
