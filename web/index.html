@@ -59,7 +59,7 @@
   .dayb{flex:1;appearance:none;background:var(--panel);border:0;border-right:1px solid var(--line);padding:11px 0;font-family:var(--ui);font-size:14px;color:var(--muted);cursor:pointer}
   .dayb:last-child{border-right:0}
   .dayb.active{background:var(--accent);color:#fff;font-weight:650}
-  .winnote{margin:14px 2px 2px;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:9px 11px;line-height:1.5}
+  .winnote{margin:14px 2px 2px;font-size:13px;color:var(--ink);background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:9px 11px;line-height:1.5}
   .btn{width:100%;cursor:pointer;font-family:var(--ui);font-size:15.5px;font-weight:650;color:#fff;background:var(--accent);border:0;border-radius:12px;padding:15px}
   .btn:disabled{opacity:.6;cursor:default}
   .status{text-align:center;color:var(--muted);font-size:13.5px;margin:22px 0}
@@ -129,7 +129,7 @@
   <main>
     <h1>New route briefing</h1>
     <div class="field" style="margin-bottom:9px">
-      <div class="rowlabel"><label>Starair Routes <span>· tap to fill</span></label><button type="button" class="linkbtn" id="editRoutes">Edit</button></div>
+      <div class="rowlabel"><label>Starair Routes <span>· tap to fill · press Edit to modify routes</span></label><button type="button" class="linkbtn" id="editRoutes">Edit</button></div>
       <div class="routes" id="routes"></div>
       <div class="routeedit" id="routeEdit" hidden>
         <button type="button" class="minibtn" id="addRoute">＋ Save current as route</button>
@@ -148,7 +148,7 @@
         <button type="button" class="dayb" data-day="tomorrow">Tomorrow</button>
       </div>
     </div>
-    <p class="winnote" id="winnote"></p>
+    <p class="winnote" id="winnote"><b>Set times to get correctly tailored WX and NOTAM</b></p>
     <div class="row2">
       <div class="field"><label>ETD <span>· UTC</span></label><input class="plain" id="etd" type="time" value="08:00"></div>
       <div class="field"><label>EET <span>· hh:mm</span></label><input class="plain" id="eet" type="text" inputmode="numeric" value="01:30" placeholder="01:30"></div>
@@ -358,30 +358,9 @@
     var b = e.target.closest('.dayb'); if(!b) return;
     selectedDay = b.dataset.day;
     document.querySelectorAll('.dayb').forEach(function(x){ x.classList.toggle('active', x===b); });
-    updateWinnote();
   });
 
-  var winnote = document.getElementById('winnote');
-  function eta(etd, eet){
-    var m = /^(\d{1,2}):?(\d{2})$/.exec((eet||'').trim());
-    var p = (etd||'').split(':');
-    if(!m || p.length<2) return null;
-    var mins = ((+p[0])*60 + (+p[1]) + (+m[1])*60 + (+m[2])) % 1440;
-    function z(n){ return (n<10?'0':'')+n; }
-    return z(Math.floor(mins/60))+z(mins%60);
-  }
-
-  // Always-visible summary of the flight window; updates live with day/ETD/EET.
-  function updateWinnote(){
-    var etd = document.getElementById('etd').value;
-    var eet = document.getElementById('eet').value;
-    var arr = eta(etd, eet);
-    winnote.innerHTML = 'NOTAMs and weather are selected and coloured for your flight window — '+
-      '<b>'+selectedDay+'</b>, ETD <b>'+etd.replace(':','')+'Z</b> → ETA <b>'+(arr||'??')+'Z</b>.';
-  }
-  document.getElementById('etd').addEventListener('input', updateWinnote);
-  document.getElementById('eet').addEventListener('input', updateWinnote);
-  updateWinnote();
+  // The flight-window prompt above ETD/EET is static markup (see #winnote).
 
   btn.addEventListener('click', function(){
     var etd = document.getElementById('etd').value;
@@ -394,7 +373,6 @@
       eet: eet.trim(),
       day: selectedDay
     };
-    updateWinnote();
     out.innerHTML=''; note.hidden=true; btn.disabled=true;
     status.textContent='Fetching live NOTAMs and rewriting… (first call can take ~30s while the free server wakes)';
     fetch('/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
