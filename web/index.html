@@ -124,11 +124,10 @@
       <div class="routes" id="routes"></div>
     </div>
     <div class="row2">
-      <div class="field"><label>DEP</label><input id="dep" value="CGN" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="CGN / EDDK"></div>
-      <div class="field"><label>ARR</label><input id="arr" value="MRS" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="MRS / LFML"></div>
+      <div class="field"><label>DEP</label><input id="dep" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ICAO or IATA"></div>
+      <div class="field"><label>ARR</label><input id="arr" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ICAO or IATA"></div>
     </div>
-    <div class="field"><label>ALT <span>· alternate(s)</span></label><input id="alt" value="NCE" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="NCE, LFMT"></div>
-    <div class="field"><label>ENR <span>· enroute, optional</span></label><input id="enr" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="LSGG LFLL"></div>
+    <div class="field"><label>ALT / ENROUTE</label><input id="alt" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ICAO or IATA"></div>
     <p class="hint">Separate codes with space, comma <code>,</code> or dot <code>.</code> — IATA or ICAO.</p>
     <div class="field"><label>Day</label>
       <div class="daytoggle" id="daytoggle">
@@ -261,11 +260,12 @@
   function applyRoute(r){
     document.getElementById('dep').value = r.dep;
     document.getElementById('arr').value = r.arr;
-    document.getElementById('alt').value = r.alt || '';
-    // Drop any enroute code already flown as dep/arr, so no airport is fetched twice.
+    // ALT + ENROUTE share one field now. Drop codes already flown as dep/arr,
+    // so no airport is fetched twice.
     var seen = (r.dep + ' ' + r.arr).toUpperCase().split(/\s+/);
-    var enr = (r.enr || '').split(/\s+/).filter(function(c){ return c && seen.indexOf(c.toUpperCase()) < 0; });
-    document.getElementById('enr').value = enr.join(' ');
+    var extra = ((r.alt || '') + ' ' + (r.enr || '')).split(/\s+/)
+      .filter(function(c){ return c && seen.indexOf(c.toUpperCase()) < 0; });
+    document.getElementById('alt').value = extra.join(' ');
   }
 
   var routesEl = document.getElementById('routes');
@@ -315,7 +315,6 @@
       dep: codes(document.getElementById('dep').value),
       arr: codes(document.getElementById('arr').value),
       alt: codes(document.getElementById('alt').value),
-      enr: codes(document.getElementById('enr').value),
       etd: etd.replace(':',''),
       eet: eet.trim(),
       day: selectedDay
