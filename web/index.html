@@ -245,16 +245,17 @@
   // Shared list for the crew flying these — edit here and push; no accounts.
   // dep = first field, arr = every airport you land at, enr = enroute/alternates.
   var ROUTES = [
-    {label:"CGN–BLQ",     dep:"CGN", arr:"BGY BLQ",     enr:"HHN BRU LGG LUX VCE LIN GOA"},
-    {label:"CGN–EDI",     dep:"CGN", arr:"EMA EDI",     enr:"STN BFS MAN BHX SNN"},
-    {label:"CGN–MRS",     dep:"CGN", arr:"MRS",         enr:"HHN BRU LGG LUX TLS BGY BOD"},
-    {label:"CGN–TLS",     dep:"CGN", arr:"LYS TLS",     enr:"HHN BRU LGG LUX TLS BGY BOD"},
-    {label:"CGN–AOI",     dep:"CGN", arr:"BGY AOI",     enr:"HHN BRU LGG LUX VCE LIN GOA PSR"},
-    {label:"CGN–HEL",     dep:"CGN", arr:"ARN HEL",     enr:"HHN BRU LGG LUX MMX CPH"},
-    {label:"CGN–VIE",     dep:"CGN", arr:"VIE",         enr:"HHN BRU LGG LUX"},
-    {label:"CGN–LIS",     dep:"CGN", arr:"OPO LIS",     enr:"HHN BRU LGG LUX CDG NTE BOD BIO LEN"},
-    {label:"CGN–ATH/SKG", dep:"CGN", arr:"MUC ATH SKG", enr:"HHN BRU LGG LUX LJU DBV BDS SKP TIA RMI AOI"},
-    {label:"CGN–BFS",     dep:"CGN", arr:"EMA BFS",     enr:"HHN BRU LGG LUX STN BFS MAN BHX SNN"}
+    {label:"CGN–AOI", dep:"CGN", arr:"BGY AOI", enr:"HHN BRU LGG LUX VCE LIN GOA PSR"},
+    {label:"CGN–ATH", dep:"CGN", arr:"MUC ATH", enr:"SKG HHN BRU LGG LUX LJU DBV BDS SKP TIA RMI AOI"},
+    {label:"CGN–BER", dep:"CGN", arr:"BER",     enr:"HHN BRU LGG LUX HAM LEJ CPH"},
+    {label:"CGN–BFS", dep:"CGN", arr:"EMA BFS", enr:"HHN BRU LGG LUX STN BFS MAN BHX SNN"},
+    {label:"CGN–BLQ", dep:"CGN", arr:"BGY BLQ", enr:"HHN BRU LGG LUX VCE LIN GOA"},
+    {label:"CGN–EDI", dep:"CGN", arr:"EMA EDI", enr:"STN BFS MAN BHX SNN"},
+    {label:"CGN–HEL", dep:"CGN", arr:"ARN HEL", enr:"HHN BRU LGG LUX MMX CPH"},
+    {label:"CGN–LIS", dep:"CGN", arr:"OPO LIS", enr:"HHN BRU LGG LUX CDG NTE BOD BIO LEN"},
+    {label:"CGN–MRS", dep:"CGN", arr:"MRS",     enr:"HHN BRU LGG LUX TLS BGY BOD"},
+    {label:"CGN–TLS", dep:"CGN", arr:"LYS TLS", enr:"HHN BRU LGG LUX TLS BGY BOD"},
+    {label:"CGN–VIE", dep:"CGN", arr:"VIE",     enr:"HHN BRU LGG LUX"}
   ];
 
   function applyRoute(r){
