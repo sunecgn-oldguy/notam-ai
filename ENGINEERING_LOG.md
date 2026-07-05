@@ -88,7 +88,7 @@ API: `POST /briefing`, `GET /health`, `GET /usage`. Env på Render: `ANTHROPIC_A
 | 5. AI-lag (none/claude/qwen) | `notam/llm.py` | ✅ live (Haiku) |
 | Cache (content-addr., tråd-sikker) | `notam/cache.py` | ✅ |
 | Token-tæller (udbyder-agnostisk) | `notam/usage.py` | ✅ (`/usage`) |
-| Vejr: METAR/TAF + 4 farvekategorier + vind | `notam/weather.py` | ✅ (19 tests, TAF-prognose) |
+| Vejr: METAR/TAF + kategorier + vind + Windy | `notam/weather.py` | ✅ (27 tests, TAF-prognose) |
 | Baner + vind-favoriseret ende | `notam/runways.py` + `runways.json` | ✅ (17 tests, OurAirports) |
 | Briefing (parallel fetch+AI) | `notam/briefing.py` | ✅ |
 | HTTP-server | `server.py` | ✅ live |
@@ -102,7 +102,7 @@ Today/Tomorrow + ETD/EET → vindue til ETA; sammenfoldelige lufthavne; **bane-l
 ILS→Approach→Runway→Navaids→Movement→rest med alder (fx "3mo"); AI-omskrevne linjer + original
 ordret i dropdown; militær + outside-window i fuld original; vejr-badge
 (CAVOK kun når bogstaveligt rapporteret · GOOD ≥10km/5000ft · OK ≥5km/1500ft · MARGINAL · LOW VIS=Cat I-minima
-≤550 m/200 ft) fra TAF-prognosen i flyve-vinduet.
+≤550 m/200 ft) fra TAF-prognosen i flyve-vinduet + "Windy"-chip når vind >20 kt (METAR/TAF-vindue).
 
 **AI-output-spec (i `llm.py` `_SYSTEM`, `_STYLE=9`):** spejl kildens ordform (udvid/forkort aldrig
 selv); behold direktiver ordret (DO NOT USE); kopiér tal+units ordret (aldrig konvertér ft↔m);
@@ -399,3 +399,13 @@ NOTAM-livscyklus: NOTAMR erstatter, NOTAMC annullerer → markér status ved hve
   scope på GitHub-token (blokerede push to gange før det blev sat). Forbehold: cron-jitter kan sjældent
   glide forbi 15-min-grænsen → enkelt kold-start (UptimeRobot 5-min mere præcist hvis nødvendigt).
   Baggrund: målt at $7 Render fjerner kold-starten; keep-alive tester samme gevinst gratis først.
+- **"Windy"-flag (pilot — natflyvning):** amber **Windy**-chip mellem "Weather" og kategorien når vinden
+  (rolig ELLER stød) **> 20 kt** — i METAR (nu) eller TAF i flyve-vinduet. TAF-vind læses **vindue-bevidst**
+  og bæres frem gennem BECMG/FM/TEMPO. Refaktorering: TAF-periode-udtrækket faktoriseret ud i
+  `_taf_conditions` (delt af `taf_category` + ny `taf_windy` + `_wind_kt`) — kategori-adfærd uændret,
+  alle 7 gamle TAF-tests grønne + 8 nye = 27 i alt. (Også vejr-polish: "Weather"-fanen 16px+bold; OK-badge
+  dybere marineblå for synlighed; OK blev kortvarigt grøn men rullet tilbage — de fire farver var bedre.)
+- **Ruter + default ETD:** ny **CGN–BOD** (Bordeaux; enroute TLS MRS CDG HHN BRU LGG LUX BGY) i
+  `DEFAULT_ROUTES` → **12 ruter**, alfabetisk efter slutdestination. **Default ETD → 23:30** (natflyvning).
+  Bemærk localStorage-fælden: enheder der allerede har gemte ruter ser ikke nye frø-ruter før "Reset to
+  Starair" eller manuel tilføjelse — iboende afvejning mellem kode-standarder og brugerens egen kopi (D16).
