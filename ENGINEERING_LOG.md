@@ -58,36 +58,53 @@ Telefon   →  brugerens ruter (lokalt + iCloud). Forlader aldrig enheden.
 | D11 | **Ruter gemmes på telefonen + iCloud** | Små data, offline, privat, ingen server/database nødvendig. Server gemmer aldrig ruter. |
 | D12 | **Content-addressed cache af AI-svar** | NOTAM ens for alle → oversæt hver NOTAM én gang i verden, genbrug gratis. Nøgle = hash(rå tekst). ~90–98% mindre AI-forbrug ved skala. Ændret tekst → nyt hash → genberegnes automatisk. |
 | D13 | **Hosting: Render** (start på free-tier) | suneg har ingen fast IP, manuel genstart ved strømudfald, væk ~50% af tiden → managed host frem for hjemmeserver. Serveren er let (AI kører hos Anthropic), så billigste plan er nok. Nøgle bor i Renders miljøvariabler. |
+| D14 | **Vejr-kilde: aviationweather.gov** | Gratis, ingen nøgle, global METAR/TAF (US NWS). Samme filosofi som FAA. |
+| D15 | **Deterministisk-først for struktureret data** | Kategori, triggers, tider, vejr = kode (aldrig AI). AI kun til fri-tekst NOTAM-sprog. Krymper hallucination-fladen. |
 
 ---
 
 ## 4. Status
 
-**Motor (Python, kun stdlib indtil AI):**
+**Live app:** https://notam-ai.onrender.com (Render, Frankfurt, free-tier). Web-UI på `/`;
+API: `POST /briefing`, `GET /health`, `GET /usage`. Env på Render: `ANTHROPIC_API_KEY`,
+`NOTAM_LLM=claude`, valgfri `NOTAM_MODEL`. Start: `gunicorn server:app --bind 0.0.0.0:$PORT --timeout 120`.
 
-| Trin | Modul | Status |
-|------|-------|--------|
-| 1. Hent rå NOTAMs (FAA) | `notam/faa.py` | ✅ virker (verificeret EDDK 21 / LFML 28) |
+**Motor** — kernen `notam/` er ren stdlib; kun serveren bruger flask/gunicorn/anthropic:
+
+| Del | Modul | Status |
+|-----|-------|--------|
+| 1. Hent NOTAMs (FAA, HTML-afkodet) | `notam/faa.py` | ✅ |
 | 2. Rens + forkortelser | `notam/clean.py`, `abbreviations.py` | ✅ |
 | 3. Q-linje-parser | `notam/qline.py` | ✅ |
-| 4. Grovfilter (relevans) | `notam/relevance.py` | ✅ (kategori + militær-afdæmpning) |
-| 6. Dato/tid-filter | `notam/timing.py` | ✅ B/C-periode + D)-skema |
-| —  D)-skema-parser | `notam/schedule.py` (+ `test_schedule.py`) | ✅ 19 tests bestået |
-| —  Enrich (limer 2+3+D) | `notam/enrich.py` | ✅ |
-| —  Lufthavnsdatabase + presets | `notam/profile.py` | ✅ |
-| 5. AI-lag (udskifteligt) | `notam/llm.py` | ✅ live: `NOTAM_LLM=claude` på Render skriver NOTAMs om til klar engelsk. (qwen-sti testes senere.) |
-| —  Cache af AI-svar | `notam/cache.py` | ✅ skitseret + testet (miss→gem→hit) |
-| —  Briefing-samler (JSON) | `notam/briefing.py` | ✅ skitseret + testet (hele kæden → dicts) |
-| —  HTTP-server (Flask) | `server.py` + `requirements.txt` | ✅ live på Render (https://notam-ai.onrender.com); Fase 1 (uden AI) verificeret end-to-end mod live data. Guide: `DEPLOY_RENDER.md` |
-| CLI | `main.py` | ✅ (`add`, `airports`, `presets`, `brief --dep … --etd …`-lignende) |
+| 4. Relevans: kategori (Q-kode) + prioritet + militær | `notam/relevance.py` | ✅ |
+| 6. Tid: B/C + D)-skema | `notam/timing.py`, `notam/schedule.py` | ✅ (19 tests) |
+| Trigger/AIP-SUP (deterministisk) | `notam/triggers.py` | ✅ (tests) |
+| Enrich (2+3+D) | `notam/enrich.py` | ✅ |
+| Lufthavns-DB + presets | `notam/profile.py` | ✅ |
+| IATA→ICAO (8471 koder) | `notam/airports.py` + `iata_icao.json` | ✅ |
+| 5. AI-lag (none/claude/qwen) | `notam/llm.py` | ✅ live (Haiku) |
+| Cache (content-addr., tråd-sikker) | `notam/cache.py` | ✅ |
+| Token-tæller (udbyder-agnostisk) | `notam/usage.py` | ✅ (`/usage`) |
+| Vejr: METAR/TAF + 4 farvekategorier | `notam/weather.py` | ✅ (17 tests, TAF-prognose) |
+| Briefing (parallel fetch+AI) | `notam/briefing.py` | ✅ |
+| HTTP-server | `server.py` | ✅ live |
+| Web-UI (mobil, vanilla) | `web/index.html` | ✅ live |
+| CLI | `main.py` | ⚠️ ikke opdateret med nyeste felter |
 
-**Prototype (mobil web-artifact):** ✅ fuld visuel prototype — input-skærm (DEP/ARR/ALT/ENR,
-IATA+ICAO, ETD/EET), NOTAM/Weather-faner, burger→About, AI-filtreret briefing med original
-NOTAM i dropdown, gem/hent/slet ruter (localStorage). **Data er stadig bagt (EDDK→LFML)** —
-ingen live-hentning endnu.
+**Live features:** DEP/ARR/ALT/ENR (IATA+ICAO), Today/Tomorrow + ETD/EET → vindue til ETA;
+sammenfoldelige lufthavne; NOTAMs sorteret ILS→Approach→Runway→Navaids→Movement→rest med alder
+(fx "3mo"); AI-omskrevne linjer + original ordret i dropdown; militær + outside-window i fuld
+original; vejr-badge (CAVOK/GOOD/MARGINAL/LOW VIS) fra TAF-prognosen i flyve-vinduet.
 
-**Ikke live endnu:** ingen server → felterne henter ikke nye NOTAMs; AI-laget er ikke kørt
-mod rigtig model.
+**AI-output-spec (i `llm.py` `_SYSTEM`, `_STYLE=9`):** spejl kildens ordform (udvid/forkort aldrig
+selv); behold direktiver ordret (DO NOT USE); kopiér tal+units ordret (aldrig konvertér ft↔m);
+opfind aldrig; drop validitetstider (vist ⟺ aktiv) + rå lat/long; tabeller → kun kernen.
+
+**Tests:** `python3 test_schedule.py` / `test_triggers.py` / `test_weather.py` (alle grønne).
+**Deploy:** push til GitHub (sunecgn-oldguy/notam-ai) → Render auto-deployer (kan pushes herfra;
+token i macOS-nøgleringen). Gratis-tier: kold-start ~30–50s efter dvale; cachen tømmes ved redeploy.
+
+**Prototype-artifact** (claude.ai, bagt data) findes stadig som design-reference; den *rigtige* app er web-UI'et.
 
 ---
 
@@ -95,38 +112,48 @@ mod rigtig model.
 
 ```
 NOTAM AI/
-  main.py                  CLI: byg database, kør briefing
-  notam/
-    faa.py                 trin 1 — hent rå NOTAMs fra FAA
-    clean.py               trin 2 — HTML-afkodning + forkortelses-udvidelse
-    abbreviations.py       kurateret ICAO-forkortelsesordbog
-    qline.py               trin 3 — parse Q-linjen (område/højde/emne)
-    enrich.py              limer trin 2+3 på en rå NOTAM
-    relevance.py           trin 4 — kategori + militær-afdæmpning
-    timing.py              trin 6 — er NOTAM aktiv i flyve-vinduet?
-    llm.py                 trin 5 — udskifteligt AI-lag (none/claude/qwen)
-    cache.py               content-addressed cache af AI-svar
-    profile.py             pilotens lufthavnsdatabase + presets
-  data/                    airports.json, presets.json, notam_cache.json
-  route_notams.txt         seneste briefing-dump (til inspektion)
+  server.py                Flask: / (web-UI), /briefing, /health, /usage
+  main.py                  CLI (byg DB, kør briefing) — ikke opdateret med nyeste felter
+  requirements.txt         flask, gunicorn, anthropic
+  DEPLOY_RENDER.md         deploy-guide
   ENGINEERING_LOG.md       dette dokument
+  web/index.html           mobil web-UI (vanilla HTML/CSS/JS)
+  notam/
+    faa.py                 trin 1 — hent rå NOTAMs (FAA) + HTML-afkod
+    clean.py, abbreviations.py   trin 2 — rens + forkortelses-ordbog
+    qline.py               trin 3 — parse Q-linjen
+    enrich.py              lim 2+3+D) på en NOTAM
+    relevance.py           kategori (Q-kode) + prioritet + militær
+    timing.py, schedule.py trin 6 — B/C-periode + D)-skema (tid-relevans)
+    triggers.py            AIP-SUP/trigger-NOTAMs (deterministisk, ingen AI)
+    llm.py                 trin 5 — udskifteligt AI-lag (none/claude/qwen) + prompt-spec
+    cache.py               content-addressed, tråd-sikker cache
+    usage.py               udbyder-agnostisk token-tæller
+    weather.py             METAR/TAF + 4 farvekategorier (TAF-prognose i vinduet)
+    airports.py, iata_icao.json   IATA→ICAO (8471 koder)
+    profile.py             lufthavns-DB + presets
+    briefing.py            samler hele kæden (parallel fetch + AI)
+  test_schedule.py, test_triggers.py, test_weather.py   tests
+  data/                    (gitignored) presets, notam_cache, m.m.
 ```
 
 ---
 
 ## 6. Åbne beslutninger / næste skridt
 
-- **Gør den ægte:** lille server (fx Flask) der eksponerer motoren, så app'en henter live.
-  Kræver sunegs server eller midlertidig sky-hosting.
-- **Kør AI-laget mod rigtig model:** test `NOTAM_LLM=claude` (kræver `ANTHROPIC_API_KEY` på
-  serveren) og sammenlign side om side med `NOTAM_LLM=qwen` (Ollama lokalt) — den eneste
-  ærlige test af om qwen2.5:14b er god nok.
-- **Modelvalg til Claude:** oversættelse er let → `claude-haiku-4-5`/`claude-sonnet-5` er
-  billigere og nok. Sat som `_CLAUDE_MODEL` i `llm.py` (ét sted).
-- ~~Fuld IATA→ICAO-opslagstabel~~ ✅ løst (se ændringslog).
-- **Naviair-tilladelse** til de danske/færøske data som juridisk backup før udgivelse.
-- **Enroute-geometri:** geometri-filteret bliver først rigtig stærkt når vi tilføjer
-  NOTAMs *langs* ruten (militærområder, GPS-jamming).
+- **Kold-start (gratis-dvale ~30–50s):** keep-alive-ping hvert ~10. min (UptimeRobot/cron-job.org)
+  eller betalt Render ($7/md). Ikke sat op endnu.
+- **Persistent cache:** gratis-tier tømmer cachen ved redeploy/dvale → Render-disk / Redis / SQLite
+  for reel cross-user-genbrug ved skala.
+- **qwen-sti:** test `NOTAM_LLM=qwen` (Ollama lokalt, qwen2.5:14b) side om side med Claude — den
+  ærlige test af om den lokale model holder.
+- **Flyvedato ud over i morgen:** kun Today/Tomorrow nu (TAF dækker ~24–30t). Fuldt dato-felt hvis nødvendigt.
+- **Flere tests:** qline, clean, relevance er utestede.
+- **Naviair-tilladelse** til danske/færøske data før udgivelse.
+- **Enroute-geometri:** NOTAMs *langs* ruten (militærområder, GPS-jamming) — geometri-filteret bliver først stærkt her.
+- **Kosmetik/valg:** "CAVOK"-badge dækker hele grøn-tieren (ikke kun literal CAVOK); Departure ligger
+  i "rest" i sorteringen (pilot kan ønske højere); blandet casing i AI-linjer (kilde=STORT, udvidelser=små).
+- ~~Fuld IATA→ICAO~~ · ~~server/live~~ · ~~D)-parser~~ · ~~vejr~~ · ~~token-tæller~~ · ~~sammenfoldelige AD~~ ✅ løst.
 
 ---
 
@@ -242,3 +269,4 @@ NOTAM AI/
   (server `day`-param → dato = i dag/+1). Note over resultatet: "NOTAMs and weather … for your
   flight window — <day>, ETD …Z → ETA …Z" (ETA beregnet i UI). Ingen fuld dato nødvendig; TAF
   dækker i dag/i morgen.
+- **Today/Tomorrow-vælger + vindue-note** tilføjet (server `day`-param, UI viser ETD→ETA). Log opdateret til live-tilstand (status/filoversigt/beslutninger D14–D15/åbne punkter) før auto-compact.
