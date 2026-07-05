@@ -62,7 +62,7 @@ Telefon   →  brugerens ruter (lokalt + iCloud). Forlader aldrig enheden.
 | D15 | **Deterministisk-først for struktureret data** | Kategori, triggers, tider, vejr = kode (aldrig AI). AI kun til fri-tekst NOTAM-sprog. Krymper hallucination-fladen. |
 | D16 | **Gemte ruter = frø i frontenden + on-device-redigering (ingen login)** | Starair-ruterne bages ind som `DEFAULT_ROUTES` (frø); hver enheds egne tilføjelser/sletninger gemmes i browserens `localStorage` og lægger sig ovenpå — realiserer D11's on-device-model for web. Ingen konti/database/server-state; dataen forlader aldrig enheden. Login er kun nødvendigt ved cross-device på fremmede enheder, server-side deling eller central styring (senere, offentligt-app-problem — bringer også auth + GDPR). iCloud-sync kommer gratis i iOS-appen. Bemærk: `data/` er gitignored → deploy-data bages ind i `notam/` eller `web/`. |
 | D17 | **Bane-i-brug = deterministisk vind-favorit (OurAirports)** | Baner + retvisende heading fra OurAirports (samme kilde/licens som IATA→ICAO). METAR-vind er også retvisende → ren geometri (headwind-komponent), ingen AI, ingen magnetisk misvisning. Kun et *hint*: støj/preferential/ILS/ATC afgør bane-i-brug — UI siger det. Calm/VRB/<3 kt → intet valg. |
-| D18 | **Skalerings-arkitektur: ingest → DB, eager på gemte ruter, lazy resten** | Fetch-per-request skalerer ikke (to pres: tid + tokens). Ved vækst: baggrunds-ingestion (poll → senere SWIM) fylder en database; pilot-kald serveres derfra (millisekunder, ingen live-fetch). Adskil de to omkostninger: **hente NOTAMs = gratis** (hent alt regelmæssigt) vs **AI = tokens** (eager kun på de gemte ruters pladser — lille/kendt/billigt; lazy for ad-hoc-pladser). Tokens ∝ ændringsrate, ikke trafik; prompt caching ~10%. Migrering er *påbygning*: den deterministiske pipeline + content-cache er allerede adskilt fra AI. Fuld plan + faser i §6. |
+| D18 | **Skalerings-arkitektur: ingest → DB, eager på gemte ruter, lazy resten** | Fetch-per-request skalerer ikke (to pres: tid + tokens). Ved vækst: baggrunds-ingestion (poll → senere SWIM) fylder en database; pilot-kald serveres derfra (millisekunder, ingen live-fetch). Adskil de to omkostninger: **hente NOTAMs = gratis** (hent alt regelmæssigt) vs **AI = tokens** (eager kun på de gemte ruters pladser — lille/kendt/billigt; lazy for ad-hoc-pladser). Tokens ∝ ændringsrate, ikke trafik (målt: 358 civile NOTAMs på de 46 pladser → **~$0,34 at oversætte ALT én gang**). Migrering er *påbygning*: den deterministiske pipeline + content-cache er allerede adskilt fra AI. Fuld plan + faser i §6. |
 
 ---
 
@@ -194,13 +194,18 @@ SERVING (pr. pilot-kald, millisekunder)
 
 **AI-strategi (løser token-presset):** hent ALT regelmæssigt (gratis), men vær selektiv med tokens:
 - **Eager** kun på pladserne i de **gemte ruter** (lille, kendt sæt, kæmpe overlap) → nul ventetid,
-  næsten nul tokens. Grov regning: ~200–400 AI-berettigede NOTAMs × ~0,1 øre ≈ få kr. at fylde én gang,
-  derefter kun *ændringer* (få øre/dag). Militær/inaktiv/trigger koster allerede 0 (deterministisk).
+  næsten nul tokens. **Målt live (token-frit, 2026-07-05):** 420 NOTAMs på de 46 rute-pladser, heraf
+  25 militær + 37 trigger/AIP-SUP = 0 AI (deterministisk); **358 AI-berettigede × ~0,1 øre = ~$0,34**
+  at oversætte ALT én gang. Derefter kun *ændringer* (~$0,03/dag) → **~$1-2/md for HELE netværket**,
+  uanset antal piloter/checks.
 - **Lazy** for ad-hoc-pladser en pilot taster → brænd ikke tokens på noget ingen ser.
 - Skalerer: så længe "eager-sættet" (∑ gemte ruter) er afgrænset, forbliver det billigt.
 
 **Token-håndtag:** (1) tokens ∝ *ændringsrate*, ikke request-rate — steady-state er billigt; opdaterings-
-frekvens = token-drejeknap. (2) prompt caching af system-prompten (~10% på gentagne kald, ~5–10× på input).
+frekvens = token-drejeknap. (2) **Prompt caching hjælper IKKE her:** system-prompten er ~600 tokens, langt
+under Haiku 4.5's cache-minimum på **4.096 tokens** (verificeret mod Anthropics docs 2026-07-05) → ville
+være en no-op. Den rigtige lever ved skala er **batching** (flere NOTAMs pr. kald → system-prompten
+amortiseres, ~3× på input) — men præmatur ved ~$0,34/fyld; gemt til hvis token-forbrug nogensinde bliver reelt.
 
 **Faser:**
 
@@ -375,3 +380,9 @@ NOTAM-livscyklus: NOTAMR erstatter, NOTAMC annullerer → markér status ved hve
   (D18 + §6): ingest → DB, eager-oversæt kun gemte-rute-pladser, lazy resten; token ∝ ændringsrate;
   faser nu/vækst/skala. Baggrund: kold-start-test viste CGN–ATH 1:20 (kold) vs ~25s (varm) — Render $7
   fjerner de ~50s kold-start; parallelisme + cache tager den varme tid videre ned.
+- **Live-måling af varm hastighed + eager-omkostning (token-verificeret):** varm CGN–ATH cache-kold
+  **31s** (AI-bundet: ~6s hentning + ~25s AI på ~130 nye NOTAMs), cache-varm **5,7s**, CGN–AOI 9,2s.
+  Token-frit talt: 420 NOTAMs / **358 AI-berettigede** på de 46 pladser → **eager-fyld ~$0,34** (~$1-2/md
+  for hele netværket). **Prompt caching undersøgt → droppet:** Haiku 4.5 kræver 4.096 tokens for caching,
+  vores prompt er ~600 → no-op (verificeret mod Anthropics docs). Ikke implementeret; batching er den
+  rigtige lever ved skala (senere). Ærlighed frem for en falsk besparelse.
