@@ -79,12 +79,12 @@
   /* weather — colour categories */
   .wxbadge,.wxcat{font-size:10px;font-weight:700;letter-spacing:.05em;border-radius:5px;padding:2px 7px;border:1px solid;white-space:nowrap}
   .wx-green{color:#1f7a45;border-color:#2e8c50;background:rgba(46,140,80,.13)}
-  .wx-blue{color:#1e6fb0;border-color:#3080c4;background:rgba(40,120,200,.13)}
+  .wx-blue{color:#0b4f97;border-color:#1a63bd;background:rgba(24,99,189,.20)}
   .wx-amber{color:#916012;border-color:#c8901e;background:rgba(200,140,20,.15)}
   .wx-red{color:#b23a30;border-color:#c8433a;background:rgba(200,60,50,.13)}
   @media (prefers-color-scheme:dark){
     .wx-green{color:#5fc487;border-color:#3a7a52;background:rgba(80,180,120,.15)}
-    .wx-blue{color:#6cb6ec;border-color:#2f5f8a;background:rgba(90,169,230,.15)}
+    .wx-blue{color:#82c4f8;border-color:#3f72ac;background:rgba(90,169,230,.24)}
     .wx-amber{color:#e6b45a;border-color:#7a5f24;background:rgba(224,164,69,.15)}
     .wx-red{color:#f08a80;border-color:#7a3a34;background:rgba(229,105,95,.16)}
   }
@@ -171,7 +171,7 @@
     return '<details class="fold"><summary>'+title+' <span class="cnt">'+items.length+'</span></summary>'+body+'</details>';
   }
 
-  var WXCLASS = {"CAVOK":"wx-green","GOOD":"wx-green","OK":"wx-green","MARGINAL":"wx-amber","LOW VIS":"wx-red"};
+  var WXCLASS = {"CAVOK":"wx-green","GOOD":"wx-green","OK":"wx-blue","MARGINAL":"wx-amber","LOW VIS":"wx-red"};
   function wxBadge(w){
     if(!w || !w.category) return '';
     return '<span class="wxbadge '+(WXCLASS[w.category]||'')+'">'+esc(w.category)+'</span>';
