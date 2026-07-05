@@ -26,7 +26,7 @@
   main{max-width:680px;margin:0 auto;padding:16px 14px 44px}
   h1{font-size:18px;margin:4px 2px 12px}
   .row2{display:flex;gap:10px}
-  .field{margin-bottom:13px;flex:1}
+  .field{margin-bottom:13px;flex:1;min-width:0}
   .field label{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--ink);margin:0 2px 6px}
   .field label span{color:var(--faint);font-weight:400;letter-spacing:0;text-transform:none}
   input{width:100%;font-family:var(--mono);font-size:16px;letter-spacing:.05em;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 13px;text-transform:uppercase}
@@ -113,7 +113,7 @@
   <div class="bar"><b>NOTAM&nbsp;<span class="pl">AI</span></b> <span class="tg">route briefing</span></div>
   <main>
     <h1>New route briefing</h1>
-    <div class="field" style="margin-bottom:9px"><label>Routes <span>· tap to fill</span></label>
+    <div class="field" style="margin-bottom:9px"><label>Starair Routes <span>· tap to fill</span></label>
       <div class="routes" id="routes"></div>
     </div>
     <div class="row2">
@@ -193,8 +193,7 @@
     var hasFav = rw.some(function(r){ return r.fav; });
     var line = '<div class="rwy"><span class="lbl">RWY</span>'+parts+
                (wind ? '<span class="wind">'+esc(wind)+'</span>' : '')+'</div>';
-    var cap = hasFav ? '<div class="rwycap">Accented end is more into wind — a hint, not the runway in use. '+
-                       'Noise abatement, ILS and ATC decide.</div>' : '';
+    var cap = hasFav ? '<div class="rwycap">Wind favors accented RWY\'s.</div>' : '';
     return line + cap;
   }
 
