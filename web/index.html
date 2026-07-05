@@ -81,14 +81,14 @@
     .wx-red{color:#f08a80;border-color:#7a3a34;background:rgba(229,105,95,.16)}
   }
   .wx{background:var(--panel);border:1px solid var(--line);border-radius:11px;margin-bottom:10px}
-  .wx>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:11px 13px;font-size:13px;color:var(--muted)}
+  .wx>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:11px 13px;font-size:14.5px;color:var(--ink)}
   .wx>summary::-webkit-details-marker{display:none}
   .wx>summary .wxcat{margin-left:auto}
   .wx>summary .car{color:var(--faint);font-size:12px;transition:transform .18s}
   .wx[open]>summary .car{transform:rotate(90deg)}
-  .wxline{padding:2px 13px 9px;font-size:11.5px;color:var(--faint);display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .wxline{padding:2px 13px 9px;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:7px;flex-wrap:wrap}
   .wxna{color:var(--faint);font-family:var(--mono)}
-  .wxpre{margin:0;padding:0 13px 13px;font-family:var(--mono);font-size:12px;line-height:1.55;color:var(--muted);white-space:pre-wrap;overflow-x:auto}
+  .wxpre{margin:0;padding:0 13px 13px;font-family:var(--mono);font-size:14px;line-height:1.55;color:var(--ink);white-space:pre-wrap;overflow-x:auto}
   .rwy{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;font-family:var(--mono);font-size:13.5px;color:var(--muted);margin-bottom:6px;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:11px}
   .rwy .lbl{font-family:var(--ui);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:700}
   .rwy .fav{color:var(--accent);font-weight:700}
@@ -102,7 +102,7 @@
   .n .top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
   .chip{font-size:10px;letter-spacing:.04em;text-transform:uppercase;font-weight:700;color:var(--chipink);background:var(--chip);border-radius:5px;padding:3px 6px;white-space:nowrap}
   .n .id{font-size:11px;color:var(--faint);font-family:var(--mono)}
-  .n .age{font-size:10px;color:var(--faint);font-family:var(--mono);border:1px solid var(--line2);border-radius:4px;padding:1px 4px}
+  .n .age{font-size:12px;color:var(--faint);font-family:var(--mono);border:1px solid var(--line2);border-radius:4px;padding:1px 5px}
   .n .car{margin-left:auto;color:var(--faint);font-size:12px;transition:transform .18s} .n[open] .car{transform:rotate(90deg)}
   .line{font-size:14.5px}
   .raw{margin:0;padding:12px 13px 15px;background:var(--panel2);border-top:1px dashed var(--line);font-family:var(--mono);font-size:12px;line-height:1.55;color:var(--muted);white-space:pre-wrap;overflow-x:auto}
@@ -136,12 +136,12 @@
         <button type="button" class="dayb" data-day="tomorrow">Tomorrow</button>
       </div>
     </div>
+    <p class="winnote" id="winnote"></p>
     <div class="row2">
       <div class="field"><label>ETD <span>· UTC</span></label><input class="plain" id="etd" type="time" value="08:00"></div>
       <div class="field"><label>EET <span>· hh:mm</span></label><input class="plain" id="eet" type="text" inputmode="numeric" value="01:30" placeholder="01:30"></div>
     </div>
     <button class="btn" id="go">Get briefing</button>
-    <p class="winnote" id="winnote" hidden></p>
     <div class="status" id="status"></div>
     <div id="out"></div>
     <div class="note" id="note" hidden><strong>Not for operational use.</strong> Live FAA data, AI-shortened. Every dropdown holds the complete original NOTAM verbatim — nothing is deleted, only prioritised, merged or collapsed. Always cross-check your official briefing.</div>
@@ -204,6 +204,9 @@
     return line + cap;
   }
 
+  // "2w" -> "2w old"; leave "today" / "new" as-is (they read wrong with "old").
+  function ageText(a){ return /\d/.test(a) ? a+' old' : a; }
+
   var out=document.getElementById('out'), status=document.getElementById('status'), note=document.getElementById('note'), btn=document.getElementById('go');
 
   function render(data){
@@ -213,7 +216,7 @@
         return '<details class="n"><summary>'+
           '<div class="top"><span class="chip">'+esc(r.category)+'</span>'+
           '<span class="id">'+esc(r.id)+'</span>'+
-          (r.age ? '<span class="age">'+esc(r.age)+'</span>' : '')+
+          (r.age ? '<span class="age">'+esc(ageText(r.age))+'</span>' : '')+
           '<span class="car">▸</span></div>'+
           '<div class="line">'+esc(r.summary)+'</div>'+
           '</summary><pre class="raw">'+esc(r.raw)+'</pre></details>';
@@ -280,6 +283,7 @@
     var b = e.target.closest('.dayb'); if(!b) return;
     selectedDay = b.dataset.day;
     document.querySelectorAll('.dayb').forEach(function(x){ x.classList.toggle('active', x===b); });
+    updateWinnote();
   });
 
   var winnote = document.getElementById('winnote');
@@ -291,6 +295,18 @@
     function z(n){ return (n<10?'0':'')+n; }
     return z(Math.floor(mins/60))+z(mins%60);
   }
+
+  // Always-visible summary of the flight window; updates live with day/ETD/EET.
+  function updateWinnote(){
+    var etd = document.getElementById('etd').value;
+    var eet = document.getElementById('eet').value;
+    var arr = eta(etd, eet);
+    winnote.innerHTML = 'NOTAMs and weather are selected and coloured for your flight window — '+
+      '<b>'+selectedDay+'</b>, ETD <b>'+etd.replace(':','')+'Z</b> → ETA <b>'+(arr||'??')+'Z</b>.';
+  }
+  document.getElementById('etd').addEventListener('input', updateWinnote);
+  document.getElementById('eet').addEventListener('input', updateWinnote);
+  updateWinnote();
 
   btn.addEventListener('click', function(){
     var etd = document.getElementById('etd').value;
@@ -304,10 +320,7 @@
       eet: eet.trim(),
       day: selectedDay
     };
-    var arr = eta(etd, eet);
-    winnote.innerHTML = 'NOTAMs and weather are selected and coloured for your flight window — '+
-      '<b>'+selectedDay+'</b>, ETD <b>'+etd.replace(':','')+'Z</b> → ETA <b>'+(arr||'??')+'Z</b>.';
-    winnote.hidden = false;
+    updateWinnote();
     out.innerHTML=''; note.hidden=true; btn.disabled=true;
     status.textContent='Fetching live NOTAMs and rewriting… (first call can take ~30s while the free server wakes)';
     fetch('/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
