@@ -32,9 +32,13 @@
   input{width:100%;font-family:var(--mono);font-size:16px;letter-spacing:.05em;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 13px;text-transform:uppercase}
   input::placeholder{color:var(--faint);font-family:var(--ui);text-transform:none;letter-spacing:0}
   input:focus{outline:none;border-color:var(--link);box-shadow:0 0 0 3px color-mix(in srgb,var(--link) 22%,transparent)}
-  /* iOS gives native time inputs extra chrome/height — strip it so ETD matches EET */
+  /* Native time inputs render differently per platform (iOS: extra height;
+     desktop: an inner clock icon + spin buttons). Strip it all so ETD == EET. */
   input[type=time]{-webkit-appearance:none;appearance:none;min-height:0}
   input[type=time]::-webkit-date-and-time-value{margin:0;text-align:left}
+  input[type=time]::-webkit-calendar-picker-indicator{display:none}
+  input[type=time]::-webkit-inner-spin-button,
+  input[type=time]::-webkit-clear-button{-webkit-appearance:none;display:none;margin:0}
   .plain{font-family:var(--ui)!important;text-transform:none!important;letter-spacing:0!important;font-size:15px!important}
   .hint{font-size:11.5px;color:var(--faint);margin:2px 2px 16px}
   .hint code{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line2);border-radius:4px;padding:0 4px}
