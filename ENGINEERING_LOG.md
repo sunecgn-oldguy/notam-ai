@@ -238,3 +238,7 @@ NOTAM AI/
   (validitet, FM/BECMG med carry-forward af sigt/skybase, TEMPO/PROB) og tager **værste kategori**
   i [ETD, ankomst]. METAR er fallback. Badge = prognose; dropdown viser "Now X · At ETD Y". 7 nye
   TAF-tests. Projektets mest komplekse parser — men isoleret i `weather.py` og testet.
+- **I dag / I morgen-vælger + vindue-note (pilot):** input har nu en Today/Tomorrow-toggle
+  (server `day`-param → dato = i dag/+1). Note over resultatet: "NOTAMs and weather … for your
+  flight window — <day>, ETD …Z → ETA …Z" (ETA beregnet i UI). Ingen fuld dato nødvendig; TAF
+  dækker i dag/i morgen.

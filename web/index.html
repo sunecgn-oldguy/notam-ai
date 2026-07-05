@@ -35,6 +35,11 @@
   .plain{font-family:var(--ui)!important;text-transform:none!important;letter-spacing:0!important;font-size:15px!important}
   .hint{font-size:11.5px;color:var(--faint);margin:2px 2px 16px}
   .hint code{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line2);border-radius:4px;padding:0 4px}
+  .daytoggle{display:flex;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  .dayb{flex:1;appearance:none;background:var(--panel);border:0;border-right:1px solid var(--line);padding:11px 0;font-family:var(--ui);font-size:14px;color:var(--muted);cursor:pointer}
+  .dayb:last-child{border-right:0}
+  .dayb.active{background:var(--accent);color:#fff;font-weight:650}
+  .winnote{margin:14px 2px 2px;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:9px 11px;line-height:1.5}
   .btn{width:100%;cursor:pointer;font-family:var(--ui);font-size:15.5px;font-weight:650;color:#fff;background:var(--accent);border:0;border-radius:12px;padding:15px}
   .btn:disabled{opacity:.6;cursor:default}
   .status{text-align:center;color:var(--muted);font-size:13.5px;margin:22px 0}
@@ -105,11 +110,18 @@
     <div class="field"><label>ALT <span>· alternate(s)</span></label><input id="alt" value="NCE" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="NCE, LFMT"></div>
     <div class="field"><label>ENR <span>· enroute, optional</span></label><input id="enr" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="LSGG LFLL"></div>
     <p class="hint">Separate codes with space, comma <code>,</code> or dot <code>.</code> — IATA or ICAO.</p>
+    <div class="field"><label>Day</label>
+      <div class="daytoggle" id="daytoggle">
+        <button type="button" class="dayb active" data-day="today">Today</button>
+        <button type="button" class="dayb" data-day="tomorrow">Tomorrow</button>
+      </div>
+    </div>
     <div class="row2">
       <div class="field"><label>ETD <span>· UTC</span></label><input class="plain" id="etd" type="time" value="08:00"></div>
       <div class="field"><label>EET <span>· hh:mm</span></label><input class="plain" id="eet" type="text" inputmode="numeric" value="01:30" placeholder="01:30"></div>
     </div>
     <button class="btn" id="go">Get briefing</button>
+    <p class="winnote" id="winnote" hidden></p>
     <div class="status" id="status"></div>
     <div id="out"></div>
     <div class="note" id="note" hidden><strong>Not for operational use.</strong> Live FAA data, AI-shortened. Every dropdown holds the complete original NOTAM verbatim — nothing is deleted, only prioritised, merged or collapsed. Always cross-check your official briefing.</div>
@@ -180,15 +192,39 @@
     note.hidden = false;
   }
 
+  var selectedDay = 'today';
+  document.getElementById('daytoggle').addEventListener('click', function(e){
+    var b = e.target.closest('.dayb'); if(!b) return;
+    selectedDay = b.dataset.day;
+    document.querySelectorAll('.dayb').forEach(function(x){ x.classList.toggle('active', x===b); });
+  });
+
+  var winnote = document.getElementById('winnote');
+  function eta(etd, eet){
+    var m = /^(\d{1,2}):?(\d{2})$/.exec((eet||'').trim());
+    var p = (etd||'').split(':');
+    if(!m || p.length<2) return null;
+    var mins = ((+p[0])*60 + (+p[1]) + (+m[1])*60 + (+m[2])) % 1440;
+    function z(n){ return (n<10?'0':'')+n; }
+    return z(Math.floor(mins/60))+z(mins%60);
+  }
+
   btn.addEventListener('click', function(){
+    var etd = document.getElementById('etd').value;
+    var eet = document.getElementById('eet').value;
     var body = {
       dep: codes(document.getElementById('dep').value),
       arr: codes(document.getElementById('arr').value),
       alt: codes(document.getElementById('alt').value),
       enr: codes(document.getElementById('enr').value),
-      etd: document.getElementById('etd').value.replace(':',''),
-      eet: document.getElementById('eet').value.trim()
+      etd: etd.replace(':',''),
+      eet: eet.trim(),
+      day: selectedDay
     };
+    var arr = eta(etd, eet);
+    winnote.innerHTML = 'NOTAMs and weather are selected and coloured for your flight window — '+
+      '<b>'+selectedDay+'</b>, ETD <b>'+etd.replace(':','')+'Z</b> → ETA <b>'+(arr||'??')+'Z</b>.';
+    winnote.hidden = false;
     out.innerHTML=''; note.hidden=true; btn.disabled=true;
     status.textContent='Fetching live NOTAMs and rewriting… (first call can take ~30s while the free server wakes)';
     fetch('/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})

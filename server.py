@@ -72,11 +72,13 @@ def _hhmm(s: str) -> tuple[int, int]:
 
 
 def _window(data: dict) -> tuple[datetime, datetime]:
-    """Derive the flight window from ETD + EET (date defaults to today, UTC)."""
-    now = datetime.now(timezone.utc)
+    """Flight window from day (today/tomorrow) + ETD + EET, all UTC."""
+    base = datetime.now(timezone.utc)
+    if str(data.get("day", "")).lower().startswith("tom"):
+        base += timedelta(days=1)
     eh, em = _hhmm(data.get("etd", "0000"))
     dh, dm = _hhmm(data.get("eet", "0000"))
-    start = now.replace(hour=eh, minute=em, second=0, microsecond=0)
+    start = base.replace(hour=eh, minute=em, second=0, microsecond=0)
     return (start, start + timedelta(hours=dh, minutes=dm))
 
 
