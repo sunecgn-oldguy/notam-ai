@@ -341,7 +341,9 @@
     var idx = -1;
     for(var i = 0; i < ROUTES.length; i++){ if(ROUTES[i].label.toLowerCase() === label.toLowerCase()){ idx = i; break; } }
     if(idx >= 0) ROUTES[idx] = route; else ROUTES.push(route);
-    sortRoutes(); saveRoutes(); activeLabel = label; renderRoutes();
+    sortRoutes(); saveRoutes(); activeLabel = label;
+    editMode = false; editBtn.textContent = 'Edit'; routeEdit.hidden = true;  // saving implies done
+    renderRoutes();
   });
 
   document.getElementById('resetRoutes').addEventListener('click', function(){
