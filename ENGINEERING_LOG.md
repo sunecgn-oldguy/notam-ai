@@ -60,7 +60,7 @@ Telefon   →  brugerens ruter (lokalt + iCloud). Forlader aldrig enheden.
 | D13 | **Hosting: Render** (start på free-tier) | suneg har ingen fast IP, manuel genstart ved strømudfald, væk ~50% af tiden → managed host frem for hjemmeserver. Serveren er let (AI kører hos Anthropic), så billigste plan er nok. Nøgle bor i Renders miljøvariabler. |
 | D14 | **Vejr-kilde: aviationweather.gov** | Gratis, ingen nøgle, global METAR/TAF (US NWS). Samme filosofi som FAA. |
 | D15 | **Deterministisk-først for struktureret data** | Kategori, triggers, tider, vejr = kode (aldrig AI). AI kun til fri-tekst NOTAM-sprog. Krymper hallucination-fladen. |
-| D16 | **Gemte ruter = statisk delt liste i frontenden (ingen login)** | Appen er (nu) til pilot + kollegaer på samme ruter → én delt liste bagt ind i `index.html` (`ROUTES`-array), redigeres + pushes. Ingen konti/database/per-bruger-state. Login + egne ruter er et *senere* offentligt-app-problem (jf. D11's iOS-vision). Betal ikke for kompleksitet der ikke bruges endnu. Bemærk: `data/` er gitignored → data der skal deployes bages ind i `notam/` eller `web/`. |
+| D16 | **Gemte ruter = frø i frontenden + on-device-redigering (ingen login)** | Starair-ruterne bages ind som `DEFAULT_ROUTES` (frø); hver enheds egne tilføjelser/sletninger gemmes i browserens `localStorage` og lægger sig ovenpå — realiserer D11's on-device-model for web. Ingen konti/database/server-state; dataen forlader aldrig enheden. Login er kun nødvendigt ved cross-device på fremmede enheder, server-side deling eller central styring (senere, offentligt-app-problem — bringer også auth + GDPR). iCloud-sync kommer gratis i iOS-appen. Bemærk: `data/` er gitignored → deploy-data bages ind i `notam/` eller `web/`. |
 | D17 | **Bane-i-brug = deterministisk vind-favorit (OurAirports)** | Baner + retvisende heading fra OurAirports (samme kilde/licens som IATA→ICAO). METAR-vind er også retvisende → ren geometri (headwind-komponent), ingen AI, ingen magnetisk misvisning. Kun et *hint*: støj/preferential/ILS/ATC afgør bane-i-brug — UI siger det. Calm/VRB/<3 kt → intet valg. |
 
 ---
@@ -94,7 +94,8 @@ API: `POST /briefing`, `GET /health`, `GET /usage`. Env på Render: `ANTHROPIC_A
 | Web-UI (mobil, vanilla) | `web/index.html` | ✅ live |
 | CLI | `main.py` | ⚠️ ikke opdateret med nyeste felter |
 
-**Live features:** ét-tryk **rute-chips** (delt crew-liste, ingen login); DEP/ARR/ALT/ENR (IATA+ICAO),
+**Live features:** ét-tryk **rute-chips** (Starair-standarder + redigerbare pr. enhed via `localStorage`,
+ingen login); DEP/ARR + ALT/ENROUTE (IATA+ICAO),
 Today/Tomorrow + ETD/EET → vindue til ETA; sammenfoldelige lufthavne; **bane-linje over vejret**
 (`RWY 06/24 · 13L/31R · …` + vind, vind-favoriseret ende fremhævet); NOTAMs sorteret
 ILS→Approach→Runway→Navaids→Movement→rest med alder (fx "3mo"); AI-omskrevne linjer + original
@@ -122,7 +123,7 @@ NOTAM AI/
   requirements.txt         flask, gunicorn, anthropic
   DEPLOY_RENDER.md         deploy-guide
   ENGINEERING_LOG.md       dette dokument
-  web/index.html           mobil web-UI (vanilla HTML/CSS/JS) — inkl. gemte ruter (ROUTES-array)
+  web/index.html           mobil web-UI (vanilla HTML/CSS/JS) — redigerbare ruter (DEFAULT_ROUTES-frø + localStorage-editor)
   tools/build_runways.py   bygger notam/runways.json fra OurAirports (reproducerbart)
   notam/
     faa.py                 trin 1 — hent rå NOTAMs (FAA) + HTML-afkod
@@ -296,3 +297,16 @@ NOTAM AI/
   360=nord, VRB/calm → ingen retning). UI viser en linje over vejret: `RWY 06/24 · 13L/31R · 13R/31L
   wind 280/12` med den vind-favoriserede ende fremhævet + caveat (støj/ILS/ATC afgør). 17 nye tests
   (`test_runways.py`). Headings og METAR-vind er begge retvisende → ingen magnetisk misvisning.
+- **UI-oprydning + navn (samme dag):** vindue-noten gjort permanent *over* ETD/EET og live-opdateret
+  (dag/ETD/EET); vejr-font større + mørkere (METAR/TAF 12→14px, grå→ink); NOTAM-alder større + " old"
+  (fx "2w old", men ikke "today"/"new"); ENR slået sammen med ALT → ét **"ALT / ENROUTE"**-felt,
+  placeholder "ICAO or IATA" i alle felter; ETD/EET ens højde (native time-chrome fjernet, iOS+desktop);
+  ny rute **CGN–BER**, ruter sorteret efter slutdestination, SKG → første ALT på ATH. Navn:
+  **NOTAM & WX AI — Route Briefing** ("/" valgt fra: læses som sti-separator i IT/URL; se [[app-branding]]).
+- **Rute-editor + `localStorage` (on-device, ingen login — D16/D11):** de bagede Starair-ruter er nu
+  `DEFAULT_ROUTES` (frø); hver enheds tilføjelser/sletninger gemmes i `localStorage` (`notamwx.routes.v1`)
+  og **overlever browser-lukning**. Edit-knap: slet rute (×), **Save current as route** (overskriver ved
+  samme navn, ellers ny; holdt sorteret efter slutdestination), **Reset to Starair**. Robust load
+  (fallback til frø ved manglende/korrupt data) + try/catch om skrivning (privat-tilstand kan ikke crashe).
+  Realiserer D11's on-device-model for web; iCloud-sync kommer gratis i iOS-appen. Logik verificeret
+  (load→gem→genindlæs efter "genstart", slet, reset, dedup).
