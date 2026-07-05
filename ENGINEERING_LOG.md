@@ -101,7 +101,8 @@ Today/Tomorrow + ETD/EET → vindue til ETA; sammenfoldelige lufthavne; **bane-l
 (`RWY 06/24 · 13L/31R · …` + vind, vind-favoriseret ende fremhævet); NOTAMs sorteret
 ILS→Approach→Runway→Navaids→Movement→rest med alder (fx "3mo"); AI-omskrevne linjer + original
 ordret i dropdown; militær + outside-window i fuld original; vejr-badge
-(CAVOK/GOOD/MARGINAL/LOW VIS, hvor LOW VIS = Cat I-minima ≤550 m/200 ft) fra TAF-prognosen i flyve-vinduet.
+(CAVOK kun når bogstaveligt rapporteret · GOOD ≥10km/5000ft · OK ≥5km/1500ft · MARGINAL · LOW VIS=Cat I-minima
+≤550 m/200 ft) fra TAF-prognosen i flyve-vinduet.
 
 **AI-output-spec (i `llm.py` `_SYSTEM`, `_STYLE=9`):** spejl kildens ordform (udvid/forkort aldrig
 selv); behold direktiver ordret (DO NOT USE); kopiér tal+units ordret (aldrig konvertér ft↔m);
@@ -150,8 +151,9 @@ NOTAM AI/
 
 ## 6. Åbne beslutninger / næste skridt
 
-- **Kold-start (gratis-dvale ~30–50s):** keep-alive-ping hvert ~10. min (UptimeRobot/cron-job.org)
-  eller betalt Render ($7/md). Ikke sat op endnu.
+- ~~**Kold-start (gratis-dvale ~30–50s):** keep-alive-ping~~ ✅ **løst:** GitHub Actions pinger `/health`
+  hvert ~10. min (`.github/workflows/keepalive.yml`). Alternativ hvis cron-jitter giver enkelte kold-starts:
+  UptimeRobot 5-min, eller betalt Render ($7/md, fjerner den helt + holder cachen varm).
 - **Persistent cache:** gratis-tier tømmer cachen ved redeploy/dvale → Render-disk / Redis / SQLite
   for reel cross-user-genbrug ved skala.
 - **qwen-sti:** test `NOTAM_LLM=qwen` (Ollama lokalt, qwen2.5:14b) side om side med Claude — den
@@ -386,3 +388,14 @@ NOTAM-livscyklus: NOTAMR erstatter, NOTAMC annullerer → markér status ved hve
   for hele netværket). **Prompt caching undersøgt → droppet:** Haiku 4.5 kræver 4.096 tokens for caching,
   vores prompt er ~600 → no-op (verificeret mod Anthropics docs). Ikke implementeret; batching er den
   rigtige lever ved skala (senere). Ærlighed frem for en falsk besparelse.
+- **Vejr: CAVOK kun når bogstaveligt (pilot):** grøn top viste "CAVOK" hver gang sigt ≥10km & loft
+  ≥5000ft — piloter blev skuffede når det ikke var *rigtig* CAVOK ("ser for godt ud i oversigten"). Nu:
+  🟢 **CAVOK KUN** når TAF/METAR bogstaveligt skriver CAVOK; 🟢 **GOOD** for godt-uden-CAVOK
+  (≥10km/≥5000ft); 🔵 **OK** for det gamle GOOD-bånd (≥5km/≥1500ft); MARGINAL/LOW VIS uændret. Begge
+  grønne labels → wx-green; `_SEVERITY` udvidet til 5 (så TAF-værste-i-vindue stadig virker). 19 tests grønne.
+- **Keep-alive (kold-start fjernet, gratis):** GitHub Actions-workflow (`.github/workflows/keepalive.yml`)
+  pinger `/health` hvert ~10. min → serveren dvaler ikke → ingen ~30-50s kold-start. Gratis+ubegrænset
+  (public repo); ekstern GET både nulstiller idle-timeren og vækker en sovende service. Krævede `workflow`-
+  scope på GitHub-token (blokerede push to gange før det blev sat). Forbehold: cron-jitter kan sjældent
+  glide forbi 15-min-grænsen → enkelt kold-start (UptimeRobot 5-min mere præcist hvis nødvendigt).
+  Baggrund: målt at $7 Render fjerner kold-starten; keep-alive tester samme gevinst gratis først.
