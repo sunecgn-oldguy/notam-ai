@@ -31,6 +31,7 @@ _PERIOD = re.compile(r"\b(\d{2})(\d{2})/(\d{2})(\d{2})\b")
 _MARKER = re.compile(r"\b(FM\d{6}|BECMG|TEMPO|PROB\d{2})\b")
 _HAS_VIS = re.compile(r"\b(\d{4}(?:NDV)?|\d+/\d+SM|\d+SM|CAVOK)\b")
 _HAS_CLOUD = re.compile(r"\b(?:FEW|SCT|BKN|OVC|VV|SKC|NSC|NCD|CLR)\d*\b")
+_WIND = re.compile(r"\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?(KT|MPS)\b")
 _SEVERITY = {"CAVOK": 0, "GOOD": 1, "MARGINAL": 2, "LOW VIS": 3}
 
 
@@ -46,6 +47,23 @@ def fetch(icao: str, window: tuple | None = None) -> dict:
         "metar": metar, "taf": taf,
         "metar_category": metar_cat, "taf_category": taf_cat,
         "category": taf_cat or metar_cat,
+        "wind": _wind(up),
+    }
+
+
+def _wind(metar: str) -> dict:
+    """Surface wind from a METAR: {'dir': deg true|None (VRB), 'speed': kt,
+    'gust': kt|None}. dir is None for variable/calm; speeds are knots."""
+    m = _WIND.search(metar.upper())
+    if not m:
+        return {"dir": None, "speed": 0, "gust": None}
+    to_kt = 1.94384 if m.group(4) == "MPS" else 1
+    spd = round(int(m.group(2)) * to_kt)
+    gust = round(int(m.group(3)) * to_kt) if m.group(3) else None
+    calm = spd == 0 or m.group(1) == "VRB"      # no usable direction
+    return {
+        "dir": None if calm else int(m.group(1)),   # 360 = north (000 = calm)
+        "speed": spd, "gust": gust,
     }
 
 

@@ -82,6 +82,11 @@
   .wxline{padding:2px 13px 9px;font-size:11.5px;color:var(--faint);display:flex;align-items:center;gap:7px;flex-wrap:wrap}
   .wxna{color:var(--faint);font-family:var(--mono)}
   .wxpre{margin:0;padding:0 13px 13px;font-family:var(--mono);font-size:12px;line-height:1.55;color:var(--muted);white-space:pre-wrap;overflow-x:auto}
+  .rwy{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;font-family:var(--mono);font-size:13.5px;color:var(--muted);margin-bottom:6px;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:11px}
+  .rwy .lbl{font-family:var(--ui);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:700}
+  .rwy .fav{color:var(--accent);font-weight:700}
+  .rwy .wind{margin-left:auto;color:var(--ink);font-weight:600;white-space:nowrap}
+  .rwycap{font-size:10.5px;color:var(--faint);margin:-2px 3px 10px;line-height:1.5}
   .glbl{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin:14px 4px 6px;font-weight:600}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
   .n{border-top:1px solid var(--line2)} .n:first-child{border-top:0}
@@ -166,6 +171,33 @@
            line+'<pre class="wxpre">'+esc(txt)+'</pre></details>';
   }
 
+  function z2(n){ return (n<10?'0':'')+n; }
+  function z3(n){ return (n<100?'0':'')+(n<10?'0':'')+n; }
+  function windText(wind){
+    if(!wind) return '';
+    if(wind.dir===null && !wind.speed) return 'wind calm';
+    var g = wind.gust ? 'G'+wind.gust : '';
+    var dir = wind.dir===null ? 'VRB' : z3(wind.dir);
+    return 'wind '+dir+'/'+z2(wind.speed)+g;
+  }
+  // Runways above the weather: each end shown, the wind-favoured one accented.
+  function runwayLine(a){
+    var rw = a.runways;
+    if(!rw || !rw.length) return '';
+    var parts = rw.map(function(r){
+      var le = r.fav==='le' ? '<span class="fav">'+esc(r.le)+'</span>' : esc(r.le);
+      var he = r.fav==='he' ? '<span class="fav">'+esc(r.he)+'</span>' : esc(r.he);
+      return le+'/'+he;
+    }).join(' · ');
+    var wind = windText(a.weather && a.weather.wind);
+    var hasFav = rw.some(function(r){ return r.fav; });
+    var line = '<div class="rwy"><span class="lbl">RWY</span>'+parts+
+               (wind ? '<span class="wind">'+esc(wind)+'</span>' : '')+'</div>';
+    var cap = hasFav ? '<div class="rwycap">Accented end is more into wind — a hint, not the runway in use. '+
+                       'Noise abatement, ILS and ATC decide.</div>' : '';
+    return line + cap;
+  }
+
   var out=document.getElementById('out'), status=document.getElementById('status'), note=document.getElementById('note'), btn=document.getElementById('go');
 
   function render(data){
@@ -191,6 +223,7 @@
           '<span class="aptcar">▸</span>'+
         '</summary>'+
         '<div class="apt-body">'+
+          runwayLine(a)+
           weatherBlock(a.weather)+
           '<div class="card">'+(rel||'<div class="empty2">No relevant NOTAMs in your window.</div>')+'</div>'+
           folds+
