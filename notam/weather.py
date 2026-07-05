@@ -10,9 +10,9 @@ METAR when there is no usable TAF.
 
 Categories (the WORSE of visibility / ceiling decides), per the pilot's spec:
   CAVOK     green   — CAVOK, or vis >= 10 km AND ceiling >= 5000 ft
-  GOOD      blue    — vis >= 5 km  AND ceiling >= 1500 ft
-  MARGINAL  amber   — vis >= 1 km  AND ceiling >= 500 ft
-  LOW VIS   red     — below that (vis < 1 km OR ceiling < 500 ft)
+  GOOD      blue    — vis >= 5 km   AND ceiling >= 1500 ft
+  MARGINAL  amber   — vis > 550 m   AND ceiling > 200 ft
+  LOW VIS   red     — at/below Cat I minima (vis <= 550 m OR ceiling <= 200 ft)
 """
 
 from __future__ import annotations
@@ -133,7 +133,7 @@ def _classify(cavok: bool, vis_m: int | None, ceil_ft: int | None):
         return None
     v = vis_m if vis_m is not None else 99999
     c = ceil_ft if ceil_ft is not None else 99999
-    if v < 1000 or c < 500:
+    if v <= 550 or c <= 200:          # at/below Cat I minima (550 m RVR / 200 ft)
         return "LOW VIS"
     if v < 5000 or c < 1500:
         return "MARGINAL"
