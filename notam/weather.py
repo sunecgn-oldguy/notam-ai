@@ -12,7 +12,7 @@ Categories (the WORSE of visibility / ceiling decides). CAVOK is shown ONLY when
 the report literally says CAVOK; good-but-not-CAVOK conditions read GOOD.
   CAVOK     green   — the report literally says CAVOK
   GOOD      green   — vis >= 10 km  AND ceiling >= 5000 ft (but not a reported CAVOK)
-  OK        blue    — vis >= 5 km   AND ceiling >= 1500 ft
+  OK        green   — vis >= 5 km   AND ceiling >= 1500 ft
   MARGINAL  amber   — vis > 550 m   AND ceiling > 200 ft
   LOW VIS   red     — at/below Cat I minima (vis <= 550 m OR ceiling <= 200 ft)
 """

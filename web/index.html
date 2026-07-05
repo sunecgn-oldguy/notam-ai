@@ -89,7 +89,7 @@
     .wx-red{color:#f08a80;border-color:#7a3a34;background:rgba(229,105,95,.16)}
   }
   .wx{background:var(--panel);border:1px solid var(--line);border-radius:11px;margin-bottom:10px}
-  .wx>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:11px 13px;font-size:14.5px;color:var(--ink)}
+  .wx>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:11px 13px;font-size:16px;font-weight:700;color:var(--ink)}
   .wx>summary::-webkit-details-marker{display:none}
   .wx>summary .wxcat{margin-left:auto}
   .wx>summary .car{color:var(--faint);font-size:12px;transition:transform .18s}
@@ -171,7 +171,7 @@
     return '<details class="fold"><summary>'+title+' <span class="cnt">'+items.length+'</span></summary>'+body+'</details>';
   }
 
-  var WXCLASS = {"CAVOK":"wx-green","GOOD":"wx-green","OK":"wx-blue","MARGINAL":"wx-amber","LOW VIS":"wx-red"};
+  var WXCLASS = {"CAVOK":"wx-green","GOOD":"wx-green","OK":"wx-green","MARGINAL":"wx-amber","LOW VIS":"wx-red"};
   function wxBadge(w){
     if(!w || !w.category) return '';
     return '<span class="wxbadge '+(WXCLASS[w.category]||'')+'">'+esc(w.category)+'</span>';
