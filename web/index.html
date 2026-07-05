@@ -47,6 +47,14 @@
   .rchip{flex:0 0 auto;cursor:pointer;font-family:var(--ui);font-size:13px;font-weight:600;color:var(--chipink);background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:8px 13px;white-space:nowrap}
   .rchip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
   .rchip:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+  .rowlabel{display:flex;align-items:baseline;gap:8px}
+  .rowlabel label{flex:1;margin-bottom:6px}
+  .linkbtn{background:none;border:0;color:var(--link);font-family:var(--ui);font-size:12.5px;font-weight:600;cursor:pointer;padding:0;white-space:nowrap}
+  .rwrap{display:inline-flex;flex:0 0 auto;align-items:center}
+  .rdel{flex:0 0 auto;cursor:pointer;width:24px;height:24px;margin-left:3px;padding:0;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--crit);font-size:15px;font-weight:700;line-height:1}
+  .routeedit{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+  .minibtn{cursor:pointer;font-family:var(--ui);font-size:13px;font-weight:600;color:#fff;background:var(--accent);border:0;border-radius:9px;padding:8px 12px}
+  .minibtn.ghost{background:var(--chip);color:var(--chipink);border:1px solid var(--line)}
   .daytoggle{display:flex;border:1px solid var(--line);border-radius:11px;overflow:hidden}
   .dayb{flex:1;appearance:none;background:var(--panel);border:0;border-right:1px solid var(--line);padding:11px 0;font-family:var(--ui);font-size:14px;color:var(--muted);cursor:pointer}
   .dayb:last-child{border-right:0}
@@ -120,8 +128,13 @@
   <div class="bar"><b>NOTAM&nbsp;&amp;&nbsp;WX&nbsp;<span class="pl">AI</span></b> <span class="tg">Route Briefing</span></div>
   <main>
     <h1>New route briefing</h1>
-    <div class="field" style="margin-bottom:9px"><label>Starair Routes <span>· tap to fill</span></label>
+    <div class="field" style="margin-bottom:9px">
+      <div class="rowlabel"><label>Starair Routes <span>· tap to fill</span></label><button type="button" class="linkbtn" id="editRoutes">Edit</button></div>
       <div class="routes" id="routes"></div>
+      <div class="routeedit" id="routeEdit" hidden>
+        <button type="button" class="minibtn" id="addRoute">＋ Save current as route</button>
+        <button type="button" class="minibtn ghost" id="resetRoutes">Reset to Starair</button>
+      </div>
     </div>
     <div class="row2">
       <div class="field"><label>DEP</label><input id="dep" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ICAO or IATA"></div>
@@ -242,9 +255,10 @@
   }
 
   // ── Saved routes ──────────────────────────────────────────────────────────
-  // Shared list for the crew flying these — edit here and push; no accounts.
-  // dep = first field, arr = every airport you land at, enr = enroute/alternates.
-  var ROUTES = [
+  // The Starair defaults (the seed). Each pilot's own edits are kept in the
+  // browser (localStorage) and layered on top — no login, no server, private to
+  // the device. Fields: dep, arr (every airport you land at), enr (ALT/ENROUTE).
+  var DEFAULT_ROUTES = [
     {label:"CGN–AOI", dep:"CGN", arr:"BGY AOI", enr:"HHN BRU LGG LUX VCE LIN GOA PSR"},
     {label:"CGN–ATH", dep:"CGN", arr:"MUC ATH", enr:"SKG HHN BRU LGG LUX LJU DBV BDS SKP TIA RMI AOI"},
     {label:"CGN–BER", dep:"CGN", arr:"BER",     enr:"HHN BRU LGG LUX HAM LEJ CPH"},
@@ -258,6 +272,22 @@
     {label:"CGN–VIE", dep:"CGN", arr:"VIE",     enr:"HHN BRU LGG LUX"}
   ];
 
+  // Personal list = the defaults, or this device's saved edits if any.
+  var RKEY = 'notamwx.routes.v1';
+  function loadRoutes(){
+    try{
+      var raw = localStorage.getItem(RKEY);
+      if(raw){ var a = JSON.parse(raw); if(Array.isArray(a) && a.length) return a; }
+    }catch(e){}
+    return DEFAULT_ROUTES.slice();
+  }
+  function saveRoutes(){ try{ localStorage.setItem(RKEY, JSON.stringify(ROUTES)); }catch(e){} }
+  var ROUTES = loadRoutes();
+  var editMode = false, activeLabel = null;
+
+  function lastCode(s){ var t = (s||'').trim().split(/\s+/); return t[t.length-1] || ''; }
+  function sortRoutes(){ ROUTES.sort(function(a,b){ return lastCode(a.arr).localeCompare(lastCode(b.arr)); }); }
+
   function applyRoute(r){
     document.getElementById('dep').value = r.dep;
     document.getElementById('arr').value = r.arr;
@@ -270,14 +300,56 @@
   }
 
   var routesEl = document.getElementById('routes');
-  routesEl.innerHTML = ROUTES.map(function(r, i){
-    return '<button type="button" class="rchip" data-i="'+i+'">'+esc(r.label)+'</button>';
-  }).join('');
+  var editBtn = document.getElementById('editRoutes');
+  var routeEdit = document.getElementById('routeEdit');
+
+  function renderRoutes(){
+    routesEl.innerHTML = ROUTES.map(function(r, i){
+      var active = r.label === activeLabel ? ' active' : '';
+      var chip = '<button type="button" class="rchip'+active+'" data-i="'+i+'">'+esc(r.label)+'</button>';
+      if(!editMode) return chip;
+      return '<span class="rwrap">'+chip+'<button type="button" class="rdel" data-del="'+i+'" '+
+             'aria-label="Delete '+esc(r.label)+'">×</button></span>';
+    }).join('');
+  }
+
   routesEl.addEventListener('click', function(e){
+    var del = e.target.closest('.rdel');
+    if(del){ ROUTES.splice(+del.dataset.del, 1); saveRoutes(); renderRoutes(); return; }
     var b = e.target.closest('.rchip'); if(!b) return;
-    applyRoute(ROUTES[+b.dataset.i]);
-    routesEl.querySelectorAll('.rchip').forEach(function(x){ x.classList.toggle('active', x===b); });
+    var r = ROUTES[+b.dataset.i];
+    applyRoute(r); activeLabel = r.label; renderRoutes();
   });
+
+  editBtn.addEventListener('click', function(){
+    editMode = !editMode;
+    editBtn.textContent = editMode ? 'Done' : 'Edit';
+    routeEdit.hidden = !editMode;
+    renderRoutes();
+  });
+
+  // Save the current DEP/ARR/ALT-ENROUTE as a route (overwrites one with the same name).
+  document.getElementById('addRoute').addEventListener('click', function(){
+    var dep = document.getElementById('dep').value.trim();
+    var arrv = document.getElementById('arr').value.trim();
+    var altenr = document.getElementById('alt').value.trim();
+    if(!dep || !arrv){ alert('Fill in DEP and ARR first, then save.'); return; }
+    var label = prompt('Route name (chip label):', activeLabel || (lastCode(dep) + '–' + lastCode(arrv)));
+    if(label === null) return;
+    label = label.trim(); if(!label) return;
+    var route = {label: label, dep: dep, arr: arrv, enr: altenr};
+    var idx = -1;
+    for(var i = 0; i < ROUTES.length; i++){ if(ROUTES[i].label.toLowerCase() === label.toLowerCase()){ idx = i; break; } }
+    if(idx >= 0) ROUTES[idx] = route; else ROUTES.push(route);
+    sortRoutes(); saveRoutes(); activeLabel = label; renderRoutes();
+  });
+
+  document.getElementById('resetRoutes').addEventListener('click', function(){
+    if(!confirm('Reset to the Starair default routes? Your own changes will be lost.')) return;
+    ROUTES = DEFAULT_ROUTES.slice(); saveRoutes(); activeLabel = null; renderRoutes();
+  });
+
+  renderRoutes();
 
   var selectedDay = 'today';
   document.getElementById('daytoggle').addEventListener('click', function(e){
