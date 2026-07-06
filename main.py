@@ -54,7 +54,10 @@ def _parse_user_dt(s: str) -> datetime:
 def _qline_summary(q: dict | None) -> str:
     if q is None:
         return "(ingen Q-linje)"
-    fl = f"FL{q['fl_lower']:03d}-{q['fl_upper']:03d}"
+    # fl_lower/fl_upper er None hvis Q-linjens FL-felt ikke var rene cifre
+    # (se qline.py). Uden dette guard ville f"FL{None:03d}" kaste TypeError.
+    lo, hi = q["fl_lower"], q["fl_upper"]
+    fl = f"FL{lo:03d}-{hi:03d}" if lo is not None and hi is not None else "FL---"
     return (f"{q['q_subject']}  {abs(q['lat']):.2f}{'N' if q['lat'] >= 0 else 'S'} "
             f"{abs(q['lon']):.2f}{'E' if q['lon'] >= 0 else 'W'} "
             f"r{q['radius_nm']}NM  {fl}")

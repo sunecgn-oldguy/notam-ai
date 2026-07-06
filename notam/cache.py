@@ -15,15 +15,16 @@ public NOTAM translations only, never user routes. Prototype storage is one JSON
 file; in the real server swap it for Redis/SQLite behind the same functions.
 """
 
-# Wiring — Used by: llm.py (get before an AI call, put after). Calls nothing
-#          internal. See ARCHITECTURE.md.
+# Wiring — Used by: llm.py (get before an AI call, put after). flush() called by
+#          briefing.py at the end of a briefing. Calls nothing internal.
+#          See ARCHITECTURE.md.
 #
-# ⚠️ EFFEKTIVITET: put() skriver HELE JSON-filen om under låsen ved hvert kald.
-# Med 16 parallelle AI-tråde der bliver færdige næsten samtidig, betyder det N
-# fulde fil-omskrivninger pr. briefing, alle serialiseret på låsen. Fint i en
-# prototype; batch skrivningerne (eller skift til SQLite) før skala. Bemærk også
-# at cleanup() aldrig kaldes nogen steder — cachen vokser ubegrænset (på Renders
-# free-disk nulstilles den dog ved redeploy). Se review-noten.
+# EFFEKTIVITET (review #2, håndteret): put() skriver ikke længere hele filen ved
+# hvert kald — den opdaterer hukommelsen og skriver højst hvert par sekunder,
+# plus én flush() til sidst. En briefing laver derfor ~1 skrivning i stedet for N.
+# Åben ende: cleanup() kaldes stadig ikke nogen steder, så cachen vokser
+# ubegrænset (på Renders free-disk nulstilles den dog ved redeploy). Wire den
+# senere hvis lageret bliver persistent (fx SQLite).
 
 from __future__ import annotations
 
@@ -38,6 +39,16 @@ _FILE = os.path.join(_DIR, "notam_cache.json")
 
 _lock = threading.Lock()
 _store: dict | None = None          # in-memory cache, loaded once, guarded by _lock
+
+# Write coalescing (review #2). The in-memory dict is the source of truth; disk
+# is just a durable copy. Rather than rewrite the whole file on every put() (16
+# parallel AI workers => N full rewrites per briefing), we write at most once
+# per _MIN_WRITE_INTERVAL and let briefing.build() call flush() once at the end.
+# Worst case on a crash: the last few seconds of summaries are lost — and a cache
+# miss just recomputes them, so it is safe to trade.
+_MIN_WRITE_INTERVAL = 3.0           # seconds between disk writes during a burst
+_dirty = False                      # in-memory has unsaved changes
+_last_write = 0.0                   # time.time() of the last disk write
 
 
 def key(raw: str) -> str:
@@ -60,13 +71,32 @@ def get(raw: str, now: float | None = None) -> str | None:
 
 
 def put(raw: str, text: str, expires: float | None = None, model: str = "") -> None:
-    """Store the processed text for this raw NOTAM (thread-safe, write-through)."""
+    """Store the processed text for this raw NOTAM (thread-safe).
+
+    Updates memory immediately; writes to disk at most once per
+    _MIN_WRITE_INTERVAL. Call flush() (briefing.build does) to force the tail of
+    a burst to disk right away.
+    """
+    global _dirty, _last_write
+    now = time.time()
     with _lock:
         _ensure_loaded()
         _store[key(raw)] = {
-            "text": text, "expires": expires, "model": model, "stored": time.time(),
+            "text": text, "expires": expires, "model": model, "stored": now,
         }
-        _write_file(_store)
+        _dirty = True
+        if now - _last_write >= _MIN_WRITE_INTERVAL:   # coalesce bursts
+            _write_file(_store)
+            _last_write, _dirty = now, False
+
+
+def flush() -> None:
+    """Persist any pending in-memory changes now (called at end of a briefing)."""
+    global _dirty, _last_write
+    with _lock:
+        if _dirty and _store is not None:
+            _write_file(_store)
+            _last_write, _dirty = time.time(), False
 
 
 def cleanup(now: float | None = None) -> int:

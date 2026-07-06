@@ -30,12 +30,24 @@ from datetime import datetime, timedelta, timezone
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from notam import briefing, feedback, usage
+from notam import briefing, feedback, ratelimit, usage
 from notam.airports import to_icao
 
 app = Flask(__name__)
 
 _WEB = os.path.join(os.path.dirname(__file__), "web")
+
+# Rate-limit the expensive /briefing endpoint (review #4): 20 briefings per hour
+# per client IP. The keep-alive pinger hits /health, not /briefing, so it is
+# unaffected. Tune here — override via env if you ever want it configurable.
+_BRIEFING_LIMIT = ratelimit.RateLimiter(max_calls=20, per_seconds=3600)
+
+
+def _client_key() -> str:
+    """Best-effort client identity for rate limiting. Render sits behind a proxy
+    that sets X-Forwarded-For, so trust its first hop; fall back to remote_addr."""
+    fwd = request.headers.get("X-Forwarded-For", "")
+    return fwd.split(",")[0].strip() if fwd else (request.remote_addr or "unknown")
 
 
 @app.get("/")
@@ -57,6 +69,11 @@ def usage_report():
 
 @app.post("/briefing")
 def make_briefing():
+    if not _BRIEFING_LIMIT.allow(_client_key()):
+        return jsonify({
+            "error": "rate_limited",
+            "message": "Too many briefings this hour. Please wait a bit and try again.",
+        }), 429
     data = request.get_json(force=True, silent=True) or {}
     return jsonify(briefing.build(_airports(data), _window(data)))
 

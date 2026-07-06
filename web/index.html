@@ -75,6 +75,7 @@
   .apt[open] .aptcar{transform:rotate(90deg)}
   .apt-body{padding:0 12px 13px}
   .empty2{padding:12px 13px;color:var(--faint);font-size:13px}
+  .apterr{margin:0 0 10px;padding:10px 12px;border:1px solid var(--crit);border-radius:11px;background:rgba(190,56,47,.10);color:var(--crit);font-size:13px;font-weight:600}
 
   /* weather — colour categories */
   .wxbadge,.wxcat,.windy{font-size:10px;font-weight:700;letter-spacing:.05em;border-radius:5px;padding:2px 7px;border:1px solid;white-space:nowrap}
@@ -260,6 +261,10 @@
           '</summary><pre class="raw">'+esc(r.raw)+'</pre></details>';
       }).join('');
       var folds = foldRaw('Military — disregarded', a.military) + foldRaw('Outside your flight window', a.inactive);
+      // If the FAA fetch failed for this airport (see briefing.py), warn loudly
+      // instead of showing an empty list that reads as "no NOTAMs".
+      var errLine = a.error ? '<div class="apterr">⚠️ Live NOTAMs could not be fetched for this airport. Check your official briefing.</div>' : '';
+      var emptyMsg = a.error ? '' : '<div class="empty2">No relevant NOTAMs in your window.</div>';
       return '<details class="apt">'+
         '<summary>'+
           '<span class="code">'+esc(a.icao)+'</span>'+
@@ -270,9 +275,10 @@
           '<span class="aptcar">▸</span>'+
         '</summary>'+
         '<div class="apt-body">'+
+          errLine+
           runwayLine(a)+
           weatherBlock(a.weather)+
-          '<div class="card">'+(rel||'<div class="empty2">No relevant NOTAMs in your window.</div>')+'</div>'+
+          '<div class="card">'+(rel||emptyMsg)+'</div>'+
           folds+
         '</div>'+
       '</details>';
@@ -404,7 +410,11 @@
     out.innerHTML=''; note.hidden=true; btn.disabled=true;
     status.textContent='Fetching live NOTAMs and rewriting… (first call can take ~30s while the free server wakes)';
     fetch('/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-      .then(function(r){ if(!r.ok) throw new Error('server '+r.status); return r.json(); })
+      .then(function(r){
+        if(r.status===429) throw new Error('too many briefings this hour — wait a bit and try again');
+        if(!r.ok) throw new Error('server '+r.status);
+        return r.json();
+      })
       .then(function(data){ status.textContent=''; render(data); })
       .catch(function(e){ status.textContent='Something went wrong ('+e.message+'). If the server was asleep, try again.'; })
       .finally(function(){ btn.disabled=false; });

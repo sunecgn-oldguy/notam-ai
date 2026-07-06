@@ -83,6 +83,8 @@ Næsten alt fejler **sikkert = vis mere, skjul aldrig ved tvivl**:
 - Fejler en AI-oversættelse → vi falder tilbage til den rene tekst.
 - Fejler vejr-hentning → tom streng, resten af briefingen kører videre.
 
-Den ene undtagelse i dag: hvis FAA-hentningen fejler for ÉN plads, vælter hele
-briefingen (se `faa.py` / `briefing.py`). Det er den vigtigste robusthedsmangel
-— se noten i `faa.py`.
+Også FAA-hentningen fejler nu sikkert i produktionsvejen: `briefing.py`
+fanger en fejl per plads og markerer den med et `error`-flag (UI'en advarer i
+stedet for at vise en misvisende tom liste), så én plads' fejl aldrig vælter
+hele ruten. Den gamle CLI (`main.py`) fanger det stadig ikke — acceptabelt for
+et dev-værktøj.

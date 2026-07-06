@@ -11,12 +11,11 @@ Only the Python standard library is used, so there is nothing to install.
 #          Calls nothing internal; talks straight to the FAA over HTTP.
 #          See ARCHITECTURE.md for the full pipeline map.
 #
-# ⚠️ ROBUSTHED: fetch_notams() har med vilje INGEN try/except. Fejler FAA for én
-# plads (timeout / 500 / ikke-JSON), kaster den — og fordi briefing.py kører den
-# i en trådpulje-map, vælter HELE briefingen (også de pladser der hentede fint).
-# Sammenlign med weather._get() og llm._summarise_parallel(), der fejler pænt.
-# Se review-noten: pak per-plads-arbejdet ind, så én plads' fejl kun tømmer den
-# ene plads i stedet for at tage hele ruten ned.
+# ROBUSTHED: fetch_notams() kaster ved FAA-fejl (timeout / 500 / ikke-JSON).
+# Det er MED VILJE — kaldere bestemmer selv hvordan de reagerer. Produktionsvejen
+# (briefing.py:_process_airport) fanger det per plads og markerer pladsen med et
+# error-flag, så én plads' fejl aldrig vælter hele ruten. Den gamle CLI (main.py)
+# fanger det ikke og vil stadig stoppe — det er acceptabelt for et dev-værktøj.
 
 from __future__ import annotations
 
