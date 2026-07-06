@@ -123,6 +123,7 @@
   .note{margin-top:24px;font-size:11.5px;color:var(--faint);line-height:1.6;border-top:1px solid var(--line2);padding-top:14px}
   .fbbtn{margin-left:auto;background:transparent;border:1px solid var(--faint);color:var(--barink);font-family:var(--ui);font-size:12.5px;font-weight:600;border-radius:8px;padding:6px 11px;cursor:pointer}
   .fbbtn:active{opacity:.7}
+  [hidden]{display:none!important}  /* beat class rules like .fbmodal/.routeedit that set display:flex */
   .fbmodal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center}
   .fbcard{width:100%;max-width:680px;background:var(--panel);border-radius:16px 16px 0 0;padding:16px 15px 20px;max-height:92vh;overflow-y:auto}
   @media (min-width:560px){.fbmodal{align-items:center}.fbcard{border-radius:16px;margin:16px}}
