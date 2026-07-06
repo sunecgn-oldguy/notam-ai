@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from notam import briefing, usage
+from notam import briefing, feedback, usage
 from notam.airports import to_icao
 
 app = Flask(__name__)
@@ -51,6 +51,14 @@ def usage_report():
 def make_briefing():
     data = request.get_json(force=True, silent=True) or {}
     return jsonify(briefing.build(_airports(data), _window(data)))
+
+
+@app.post("/feedback")
+def make_feedback():
+    """Pilot feedback: saved to a file (backup) and emailed to the owner."""
+    data = request.get_json(force=True, silent=True) or {}
+    return jsonify(feedback.submit(
+        data.get("message", ""), data.get("email", ""), data.get("context") or {}))
 
 
 def _codes(raw: str) -> list[str]:
