@@ -11,6 +11,10 @@ Nothing is ever deleted. Every NOTAM gets a tier ("high" or "low"); "low" just
 means "show it lower / collapsed". The raw text always stays available.
 """
 
+# Wiring — Used by: briefing.py and main.py (classify + priority + category).
+#          Input is an enriched NOTAM (needs .qline from enrich.py). Calls
+#          nothing internal — pure lookup tables. See ARCHITECTURE.md.
+
 from __future__ import annotations
 
 # ICAO Q-code subject groups: the first letter of the 2-letter subject

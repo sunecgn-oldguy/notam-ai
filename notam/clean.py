@@ -8,6 +8,9 @@ Only whole-token matches are expanded, so navaid identifiers and names
 (e.g. "MRM", "COL") are never touched.
 """
 
+# Wiring — Used by: enrich.py (via clean()).  Calls: abbreviations.py (the word
+#          list).  See ARCHITECTURE.md for the full map.
+
 from __future__ import annotations
 
 import html

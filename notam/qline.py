@@ -17,6 +17,11 @@ instead of guessing. Example:
 Returns a dict of parsed values, or None if the raw text has no usable Q-line.
 """
 
+# Wiring — Used by: enrich.py (parse_qline).  The result (fl_lower/fl_upper/lat/
+#          lon/q_subject) feeds relevance.py, briefing.py and main.py.
+#          NB: fl_lower/fl_upper can be None (non-digit field) — callers that
+#          format them must guard (main.py._qline_summary gør det IKKE endnu).
+
 from __future__ import annotations
 
 import re

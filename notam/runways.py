@@ -9,6 +9,10 @@ runway-in-use call: noise abatement, preferential runways, ILS availability and
 ATC all override wind. The UI says so; the pilot decides.
 """
 
+# Wiring — Used by: briefing.py (_airport_view calls view() with the METAR wind).
+#          Reads notam/runways.json (built by tools/build_runways.py). See
+#          ARCHITECTURE.md.
+
 from __future__ import annotations
 
 import json

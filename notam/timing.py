@@ -14,6 +14,10 @@ Note (known limitation): the optional daily time-band (the "D)" field, e.g.
 daily window still shows. That over-shows, which is the safe direction.
 """
 
+# Wiring — Used by: briefing.py + main.py (is_active_during) and llm.py +
+#          briefing.py (parse_notam_dt, for cache-expiry and NOTAM age).
+#          Calls: schedule.py (the D) daily-band parser). See ARCHITECTURE.md.
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

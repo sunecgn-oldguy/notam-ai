@@ -18,6 +18,11 @@ Providers (env NOTAM_LLM):
   qwen   — local qwen2.5:14b via Ollama on localhost.
 """
 
+# Wiring — Used by: briefing.py (_summarise_parallel + _view call summarise()).
+#          Calls: triggers.py (skip AI for AIP-SUP refs), cache.py (global reuse),
+#          usage.py (token counting), timing.py (parse_notam_dt for cache expiry).
+#          See ARCHITECTURE.md for how this fits the pipeline.
+
 from __future__ import annotations
 
 import json

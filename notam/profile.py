@@ -12,6 +12,10 @@ In the real app this becomes local storage / SQLite; the interface here stays
 the same so the rest of the code never has to care where it is stored.
 """
 
+# Wiring — Used by: main.py (the CLI) ONLY. The deployed web app keeps routes in
+#          the browser's localStorage (see web/index.html), so profile.py is not
+#          in the app's request path. See ARCHITECTURE.md.
+
 from __future__ import annotations
 
 import json

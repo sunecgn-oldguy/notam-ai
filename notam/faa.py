@@ -7,6 +7,17 @@ FAA SWIM feed (same data, supported interface) — see memory/notam-data-source.
 Only the Python standard library is used, so there is nothing to install.
 """
 
+# Wiring — Used by: briefing.py (_process_airport) and main.py (_report_airport).
+#          Calls nothing internal; talks straight to the FAA over HTTP.
+#          See ARCHITECTURE.md for the full pipeline map.
+#
+# ⚠️ ROBUSTHED: fetch_notams() har med vilje INGEN try/except. Fejler FAA for én
+# plads (timeout / 500 / ikke-JSON), kaster den — og fordi briefing.py kører den
+# i en trådpulje-map, vælter HELE briefingen (også de pladser der hentede fint).
+# Sammenlign med weather._get() og llm._summarise_parallel(), der fejler pænt.
+# Se review-noten: pak per-plads-arbejdet ind, så én plads' fejl kun tømmer den
+# ene plads i stedet for at tage hele ruten ned.
+
 from __future__ import annotations
 
 import html

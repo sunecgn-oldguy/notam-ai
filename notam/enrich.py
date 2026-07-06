@@ -6,6 +6,9 @@ from faa.fetch_notams and returns a copy with two extra fields:
   - "qline" : the parsed Q-line dict (area, altitude, subject) or None
 """
 
+# Wiring — Used by: briefing.py (_process_airport) and main.py (_report_airport).
+#          Calls: clean.py (clean) + qline.py (parse_qline). See ARCHITECTURE.md.
+
 from __future__ import annotations
 
 from notam.clean import clean

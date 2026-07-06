@@ -7,6 +7,10 @@ nothing for the AI to simplify — it can only guess, which caused a hallucinati
 build an honest summary from the NOTAM's own words only.
 """
 
+# Wiring — Used by: llm.py (checked first in summarise(); if is_document_ref()
+#          is True we return summary() and spend no AI). Calls nothing internal.
+#          See ARCHITECTURE.md.
+
 from __future__ import annotations
 
 import re

@@ -16,6 +16,9 @@ Not handled (-> None): sunrise/sunset (SR/SS) and anything unusual.
 All times are UTC (as NOTAM times and the flight window are).
 """
 
+# Wiring — Used by: timing.py (active_during, the second of its two gates).
+#          Calls nothing internal. See ARCHITECTURE.md for the full map.
+
 from __future__ import annotations
 
 import re

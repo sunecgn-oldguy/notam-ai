@@ -12,6 +12,14 @@ Request:  POST /briefing
   { "dep": "EDDK", "arr": "LFML", "alt": "LFMN", "enr": "LSGG LFLL",
     "etd": "0800", "eet": "0130" }
 Codes are ICAO for now, separated by space / comma / dot.
+
+Wiring — this is the HTTP entry point (Render runs `gunicorn server:app`). It is
+a thin adapter: parse the request, then hand off to the engine.
+  /briefing -> briefing.build()   (notam/briefing.py — the whole pipeline)
+  /feedback -> feedback.submit()  (notam/feedback.py)
+  /usage    -> usage.snapshot()   (notam/usage.py)
+  input codes -> airports.to_icao() (notam/airports.py)
+The engine in notam/ is pure stdlib; Flask lives only here. See ARCHITECTURE.md.
 """
 
 from __future__ import annotations

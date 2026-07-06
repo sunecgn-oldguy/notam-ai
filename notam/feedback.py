@@ -14,6 +14,9 @@ the endpoint works before any credentials exist. Swapping Gmail for another
 provider (e.g. Resend) means changing only _send_email().
 """
 
+# Wiring — Used by: server.py (POST /feedback -> submit()). Calls nothing
+#          internal. See ARCHITECTURE.md.
+
 from __future__ import annotations
 
 import json

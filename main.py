@@ -22,6 +22,13 @@ Commands (the CLI is just for testing; the app reuses notam/profile.py):
     python3 main.py brief --preset "CGN-MRS" --dep-time "2026-07-06 0800"
 
 Times are UTC, "YYYY-MM-DD HHMM". Full raw text is written to route_notams.txt.
+
+NB for new readers: this is the DEVELOPER CLI, not the app's code path. It wires
+its own copy of fetch -> enrich -> classify -> time-gate (see _report_airport)
+and deliberately stops BEFORE the AI/weather/runway/cache layer that the app
+uses. The production pipeline lives in notam/briefing.py. When you change
+pipeline logic, check whether both this file and briefing.py need it.
+See ARCHITECTURE.md.
 """
 
 from __future__ import annotations

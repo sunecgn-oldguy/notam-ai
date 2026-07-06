@@ -6,6 +6,9 @@ IATA->ICAO table is built from the public OurAirports dataset
 unknown 3-letter code is returned unchanged (it will simply yield no NOTAMs).
 """
 
+# Wiring — Used by: server.py (_codes turns each pilot-typed code into ICAO before
+#          fetching). Reads notam/iata_icao.json. See ARCHITECTURE.md.
+
 from __future__ import annotations
 
 import json

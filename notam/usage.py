@@ -10,6 +10,9 @@ the server restarts — i.e. "usage since the server last started".
 Thread-safe: summaries run in parallel.
 """
 
+# Wiring — record() called by llm.py after each real model call; snapshot() read
+#          by server.py for the /usage endpoint. Calls nothing internal.
+
 from __future__ import annotations
 
 import threading

@@ -15,6 +15,16 @@ public NOTAM translations only, never user routes. Prototype storage is one JSON
 file; in the real server swap it for Redis/SQLite behind the same functions.
 """
 
+# Wiring — Used by: llm.py (get before an AI call, put after). Calls nothing
+#          internal. See ARCHITECTURE.md.
+#
+# ⚠️ EFFEKTIVITET: put() skriver HELE JSON-filen om under låsen ved hvert kald.
+# Med 16 parallelle AI-tråde der bliver færdige næsten samtidig, betyder det N
+# fulde fil-omskrivninger pr. briefing, alle serialiseret på låsen. Fint i en
+# prototype; batch skrivningerne (eller skift til SQLite) før skala. Bemærk også
+# at cleanup() aldrig kaldes nogen steder — cachen vokser ubegrænset (på Renders
+# free-disk nulstilles den dog ved redeploy). Se review-noten.
+
 from __future__ import annotations
 
 import hashlib

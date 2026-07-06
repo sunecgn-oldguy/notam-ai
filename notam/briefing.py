@@ -7,6 +7,10 @@ together: fetch -> enrich -> classify -> time-gate -> AI summary (cached).
 The two I/O-bound steps run concurrently: the FAA fetches (one per airport) and
 the AI summaries (one per relevant NOTAM). The cache is thread-safe (see
 cache.py), so parallel summaries never clobber each other.
+
+This is the PRODUCTION path (what the app hits). The CLI in main.py wires a
+similar-but-simpler pipeline for developer testing — see ARCHITECTURE.md for how
+the two relate. Called by: server.py (POST /briefing).
 """
 
 from __future__ import annotations

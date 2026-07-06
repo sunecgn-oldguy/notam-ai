@@ -17,6 +17,11 @@ the report literally says CAVOK; good-but-not-CAVOK conditions read GOOD.
   LOW VIS   red     — at/below Cat I minima (vis <= 550 m OR ceiling <= 200 ft)
 """
 
+# Wiring — Used by: briefing.py (_process_airport calls fetch(); the wind feeds
+#          runways.view()). Calls nothing internal; talks to aviationweather.gov.
+#          _get() fejler pænt (tom streng), så vejr-fejl aldrig vælter briefingen.
+#          See ARCHITECTURE.md.
+
 from __future__ import annotations
 
 import re
