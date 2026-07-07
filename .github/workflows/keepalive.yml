@@ -25,3 +25,20 @@ jobs:
         run: |
           curl -fsS --max-time 90 https://notam-ai.onrender.com/health \
             && echo " — service awake"
+
+  # Accumulate a LIFETIME token total that survives redeploys. The app's /usage
+  # counter is in-memory and resets on every redeploy (Render's disk is
+  # ephemeral), so we fold each snapshot into a running total kept in a secret
+  # Gist. Separate job from `ping` on purpose — a bug here can never affect the
+  # keep-alive ping. Skips itself cleanly until the secrets below are set.
+  usage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Accumulate token usage into a Gist
+        continue-on-error: true          # never fail the workflow over telemetry
+        env:
+          APP_URL: https://notam-ai.onrender.com
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+        run: python3 .github/scripts/log_usage.py

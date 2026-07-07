@@ -27,8 +27,9 @@ Opret et tomt repo på github.com, og følg deres to linjer (`git remote add …
 3. **Environment → Add Environment Variable:**
    - `ANTHROPIC_API_KEY` = din nøgle (fra console.anthropic.com)
    - `NOTAM_LLM` = `claude`  *(eller lad den være tom/`none` indtil du vil tænde AI'en)*
-4. Vælg **Free** for at teste (går i dvale ved inaktivitet — første kald ~30 sek),
-   eller **Starter (~$7/md)** når den skal være vågen døgnet rundt.
+4. Vælg **Free** for at teste (går i dvale ved inaktivitet — første kald ~30 sek;
+   keep-alive-workflow'et holder den vågen gratis). Renders billige faste plan er
+   udgået — næste betalte trin er ~$25/md, så bliv på Free til prototypen.
 5. **Create Web Service.** Render giver dig en fast adresse, fx
    `https://notam-ai.onrender.com`.
 
