@@ -11,6 +11,11 @@
 Both return the same list of small dicts (id/airport/start/end/raw/…), so nothing
 downstream (enrich, relevance, timing, llm) changes when you switch sources.
 
+A shared short-TTL, single-flight cache (fetchcache.py) fronts both sources so
+thousands of pilots collapse to one upstream fetch per airport per TTL:
+  NOTAM_CACHE_TTL   seconds a NOTAM list is reused across pilots (default 300;
+                    0 disables). Lower = fresher data; higher = fewer FAA calls.
+
 NMS-API config (server env vars — the KEY/SECRET come from FAA's onboarding Excel;
 NEVER hardcode them):
   FAA_NMS_KEY / FAA_NMS_SECRET   OAuth2 client_id / client_secret
@@ -43,6 +48,8 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 
+from notam import fetchcache
+
 
 def fetch_notams(icao: str) -> list[dict]:
     """Return the active NOTAMs for one ICAO airport code (e.g. "EDDK").
@@ -50,10 +57,24 @@ def fetch_notams(icao: str) -> list[dict]:
     Each NOTAM is a small dict with clear field names. The full raw ICAO text
     (including the Q-line) is kept under "raw" so later steps can parse the
     affected area and altitude from it.
+
+    A short-TTL, single-flight cache (fetchcache.py) sits in front: a NOTAM list
+    is the same for every pilot, so with thousands of pilots we fetch each airport
+    from the FAA at most once per NOTAM_CACHE_TTL seconds no matter how many
+    pilots ask. Set NOTAM_CACHE_TTL=0 to disable (always fetch fresh).
     """
-    if os.environ.get("NOTAM_SOURCE", "web").lower() == "nms":
-        return _fetch_nms(icao)
-    return _fetch_web(icao)
+    icao = (icao or "").upper()
+    source = os.environ.get("NOTAM_SOURCE", "web").lower()
+    ttl = float(os.environ.get("NOTAM_CACHE_TTL", "300"))     # 5 min default
+    if ttl <= 0:
+        return _fetch_source(icao, source)
+    # Key by source too, so flipping NOTAM_SOURCE never serves cross-source data.
+    return fetchcache.get_or_fetch(source + ":" + icao,
+                                   lambda: _fetch_source(icao, source), ttl)
+
+
+def _fetch_source(icao: str, source: str) -> list[dict]:
+    return _fetch_nms(icao) if source == "nms" else _fetch_web(icao)
 
 
 # ---------------- source: web (default, undocumented FAA NOTAM Search) ----------

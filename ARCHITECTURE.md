@@ -71,6 +71,7 @@ og `cache.py`.
 
 | Fil | Rolle |
 |-----|-------|
+| `fetchcache.py` | delt kort-TTL + single-flight cache foran `faa.py` — mange piloter → ét FAA-kald pr. plads (skalering) |
 | `feedback.py` | `/feedback` → gem i fil + send email (pilot-feedback) |
 | `usage.py` | token-tæller, vises på `/usage` |
 | `profile.py` | pilotens plads-database + presets — **kun** CLI'en (appen bruger localStorage) |
