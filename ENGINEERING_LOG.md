@@ -409,3 +409,55 @@ NOTAM-livscyklus: NOTAMR erstatter, NOTAMC annullerer → markér status ved hve
   `DEFAULT_ROUTES` → **12 ruter**, alfabetisk efter slutdestination. **Default ETD → 23:30** (natflyvning).
   Bemærk localStorage-fælden: enheder der allerede har gemte ruter ser ikke nye frø-ruter før "Reset to
   Starair" eller manuel tilføjelse — iboende afvejning mellem kode-standarder og brugerens egen kopi (D16).
+
+## 2026-07-08 — Skala, offline & officiel datakilde (session-log til genoptagelse)
+
+- **Deploy + fejlrettelser:** appen kom live på Render (`notam-ai.onrender.com`), env-vars sat
+  (ANTHROPIC_API_KEY, NOTAM_LLM=claude, FEEDBACK_SMTP_*). Bug: feedback-modalen sad fast åben — CSS
+  `.fbmodal{display:flex}` overtrumfede `[hidden]`; fikset med global `[hidden]{display:none!important}`.
+- **Kodegennemgang (streng) + rettelser:** (1) FAA-fejl isoleres nu per plads i `briefing._process_airport`
+  (fanget → tom gruppe m. `error="notam_fetch_failed"`, UI viser ⚠️-banner i stedet for misvisende tom
+  liste); (2) `cache.put` skriver ikke længere hele filen ved hvert kald — write-coalescing + `flush()` ved
+  briefing-slut (~1 skrivning i stedet for N); (4) **rate-limit** på `/briefing`: 20/time/IP
+  (`notam/ratelimit.py`, sliding window) → 429 med tydelig banner; (5) `main._qline_summary` crasher ikke
+  længere på NULL flight-levels. Alle testfiler grønne.
+- **Dokumentation:** `ARCHITECTURE.md` (dataflow + hvem-kalder-hvem), `TEKNISK_RAPPORT.md` (funktion-for-
+  funktion, dansk; også genereret som PDF på skrivebordet via xhtml2pdf), og korte `Wiring —`-noter øverst
+  i hver `notam/`-fil. QR-plakat (A4 PDF, engelsk) til crewrummet.
+- **PWA / offline (stor gevinst, testet virker):** `web/sw.js` (service worker cacher app-skallen offline),
+  `web/manifest.json` + genererede ikoner + apple-touch-meta (installerbar "Føj til hjemmeskærm"). **Hver
+  "Get briefing" gemmes automatisk i IndexedDB**, keyet på rute; en "Saved briefings"-liste (offline) lader
+  piloten gen-åbne **alle** downloadede ruter, hver med UTC-tidsstempel. Ingen "NOT LIVE"-banner (underforstået
+  for piloter). server.py serverer /sw.js, /manifest.json, /icon-{192,512}.png fra roden.
+- **Token-telemetri der overlever redeploys:** keep-alive-workflow'et fik et isoleret `usage`-job der hvert
+  ~10. min henter `/usage` og akkumulerer lifetime-total i en **secret Gist** (`notam-ai-usage.json`) — med
+  redeploy-reset-detektion (`_normalise`/single-flight-agtigt). Løser at `/usage` er in-memory og nulstilles
+  ved redeploy (Renders disk er ephemeral). Gist-ID + `gist`-scope-PAT som GitHub-secrets. Virker live.
+- **Officielt FAA NMS-API som udskiftelig kilde (verificeret):** `faa.py` dispatcher nu på `NOTAM_SOURCE`
+  (default "web" = uændret; "nms" = officielt API). Testet mod **live staging** med rigtige credentials
+  (den krypterede onboarding-Excel, password = strengen fra CGI's "Follow-up"-mail): **europæisk dækning
+  bekræftet** (EDDK gav 24 NOTAMs) og **fuld rå ICAO-tekst** i `notamTranslation[ICAO].formattedText` →
+  mapper 1:1 til pipelinens dict-form. OAuth2 client_credentials → cachet bearer (~30 min), GEOJSON,
+  ISO→"MM/DD/YYYY HHMM"-konvertering, throttle (`FAA_NMS_MIN_INTERVAL`, staging spike-arrest 1/sek).
+  Nøgler kun som env-vars. Det gemte EDDK-svar kørt rent gennem hele pipelinen (24/24 Q-linjer + body).
+- **Server-side NOTAM-cache = skalerings-håndtaget:** `notam/fetchcache.py` — delt kort-TTL
+  (`NOTAM_CACHE_TTL`, default 300s) + **single-flight** foran `fetch_notams`. Mange piloter der briefer samme
+  plads → **ét** FAA-kald (verificeret: 3× EDDK = 1 kald; 30 samtidige tråde coalescer til 1). Virker for
+  begge kilder. Ny `test_fetchcache.py`. Gør rate-limit håndterbar ved 5000 piloter.
+- **Strategi/beslutninger (parkeret til produktion):**
+  - **Mirror-modellen** (pilotens egen idé): seed klyngen af brugte pladser én gang, hold frisk med
+    `?lastUpdatedDate=` deltaer + `/notams/checklist` reconciliation ind imellem. Gør FAA-kaldsvolumen
+    uafhængig af antal piloter → **rate-limit bliver ligegyldig**. (SWIM/FNS JMS-push er det tunge alternativ;
+    mirror er den pragmatiske mellemvej: kræver DB + planlagt poller, ikke messaging-infra.)
+  - **FAA-sporet PARKERET til produktion.** Rate-limit-mailen droppet (mirror løser det). FAA-kontakt kun
+    nødvendig for (a) **prod-adgang** (staging = testdata; org-navn-spørgsmålet uafklaret) og (b) **tilladelse
+    til at spejle/redistribuere** — ikke throughput.
+  - **Kilde-resiliens:** den udskiftelige `fetch_notams` gør et kildeskift indeholdt. For et europæisk produkt
+    er **EUROCONTROL EAD** den naturlige autoritative kilde (europæisk-drevet), men kommerciel kontrakt +
+    royalties (modsat FAA's US public domain/gratis). **Forespørgsels-mail sendt til `ead.service@eurocontrol.int`**
+    (venter svar). Lettere alternativer: NavBlue (Airbus), Lido (Lufthansa Systems), Notamify.
+- **Status ved session-slut:** live/default kører web-kilden + AI-cache + NOTAM-cache + rate-limit + PWA
+  offline + feedback + token-telemetri. NMS-API bygget men slået fra (flag). Intet produktions-tungt tændt →
+  prototypen kører let og billigt. **Næste mulige skridt (intet blokeret):** brug + pilot-feedback → iteration;
+  app-features; eller produktions-planlægning (hosting, DB+mirror, kilde+licens) når EAD/FAA svarer.
+  Ventende eksterne: **FAA prod-adgang** og **EUROCONTROL EAD-tilbud**.
