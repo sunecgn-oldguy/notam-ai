@@ -28,7 +28,7 @@ import os
 import re
 from datetime import datetime, timedelta, timezone
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, abort, jsonify, request, send_from_directory
 
 from notam import briefing, feedback, ratelimit, usage
 from notam.airports import to_icao
@@ -54,6 +54,28 @@ def _client_key() -> str:
 def index():
     """A simple browser UI for trying the engine (served from the same origin)."""
     return send_from_directory(_WEB, "index.html")
+
+
+# --- PWA static assets (served from the site root so the service worker's scope
+#     is the whole origin). These make the app installable + offline-capable;
+#     saved briefings live in the browser's IndexedDB (see web/index.html). ---
+
+@app.get("/sw.js")
+def service_worker():
+    return send_from_directory(_WEB, "sw.js", mimetype="application/javascript")
+
+
+@app.get("/manifest.json")
+def manifest():
+    return send_from_directory(_WEB, "manifest.json",
+                               mimetype="application/manifest+json")
+
+
+@app.get("/icon-<int:size>.png")
+def icon(size: int):
+    if size not in (192, 512):
+        abort(404)
+    return send_from_directory(_WEB, f"icon-{size}.png")
 
 
 @app.get("/health")
