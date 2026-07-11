@@ -77,9 +77,11 @@
   .dlopen{flex:1;display:flex;align-items:center;gap:9px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 13px;font-size:15px;font-weight:700;color:var(--ink);cursor:pointer}
   .dlopen:active{background:var(--panel2)}
   .dlopen .dlwhen{margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:400;color:var(--faint)}
+  .dlopen .dlwhen.dlstale{color:var(--warn);font-weight:700}
   .dldel{flex:0 0 auto;width:40px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--faint);font-size:18px;line-height:1;cursor:pointer}
   .dldel:active{background:var(--panel2);color:var(--crit)}
   .savedtag{text-align:center;color:var(--faint);font-size:12px;font-family:var(--mono);margin:6px 0 -6px}
+  .savedtag.dlstale{color:var(--warn);font-weight:700}
   .apt{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin:12px 0;overflow:hidden}
   .apt>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:9px;padding:13px 14px}
   .apt>summary::-webkit-details-marker{display:none}
@@ -514,9 +516,10 @@
       dlEl.hidden = false;
       dlEl.innerHTML = '<div class="dlhdr">Saved briefings · available offline</div>' +
         list.map(function(r, i){
+          var stale = (Date.now() - new Date(r.savedAt).getTime()) > 2*60*60*1000;
           return '<div class="dlrow">' +
             '<button type="button" class="dlopen" data-i="'+i+'">' +
-              '<span>'+esc(r.name)+'</span><span class="dlwhen">'+esc(fmtZ(r.savedAt))+'</span>' +
+              '<span>'+esc(r.name)+'</span><span class="dlwhen'+(stale?' dlstale':'')+'">'+esc(fmtZ(r.savedAt))+'</span>' +
             '</button>' +
             '<button type="button" class="dldel" data-i="'+i+'" aria-label="Delete '+esc(r.name)+'">×</button>' +
           '</div>';
@@ -530,8 +533,9 @@
     var s = _saved[+op.getAttribute('data-i')]; if(!s) return;
     window.__lastBriefing = s.data; window.__lastQuery = s.query || null;
     render(s.data);
+    var stale = (Date.now() - new Date(s.savedAt).getTime()) > 2*60*60*1000;
     out.insertAdjacentHTML('afterbegin',
-      '<div class="savedtag">Saved briefing · '+esc(s.name)+' · '+esc(fmtZ(s.savedAt))+'</div>');
+      '<div class="savedtag'+(stale?' dlstale':'')+'">Saved briefing · '+esc(s.name)+' · '+esc(fmtZ(s.savedAt))+'</div>');
     out.scrollIntoView({behavior:'smooth', block:'start'});
   });
 
