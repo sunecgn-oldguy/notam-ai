@@ -497,3 +497,37 @@ før stille fortolket som `00:00` (forkert briefing-vindue, ingen fejl vist) —
 **Læring:** en `or`-fallback der kalder en fejlbar funktion uden for det try/except der beskytter
 det oprindelige kald, ophæver beskyttelsen. Og: eksterne feeds leverer tomme poster — filtrér ved
 kilden, ikke nedstrøms.
+
+## 2026-07-22 (2) — Onboarding-skærm og anonym brugertælling
+
+**Onboarding:** ny bruger så et tomt skema uden at vide hvad der var påkrævet. Nu vises en
+"How it works"-overlay ved **første** åbning (gemt som `notamwx.helpseen` med versionsnummer, så en
+senere omskrivning kan vise sig igen), og derefter kun via et `?` i topbaren. Tre trin, fordi der er
+præcis tre ting at gøre: **1)** indtast aerodromes (DEP+ARR påkrævet, ALT/ENROUTE valgfri),
+**2)** vælg dag, ETD og EET — med begrundelsen *forkerte tider giver forkerte NOTAM*,
+**3)** gem eller rediger ruter (chip = udfyld, Edit = gem/slet, ligger på enheden).
+
+**Brugertælling — hvor mange bruger appen:**
+- `notam/stats.py` — tæller briefinger og *unikke enheder*. Enheds-ID'et er en tilfældig streng,
+  browseren selv genererer og gemmer i localStorage (`crypto.getRandomValues`, 16 hex). **Ikke**
+  afledt af IP, telefon eller person: svarer på *hvor mange*, aldrig *hvem*. Serveren validerer
+  formatet og dropper alt andet (loft på 10.000 mod misbrug).
+- `/stats.json` (JSON til keep-alive) og `/stats` (læsbar side) — begge kræver `?key=STATS_KEY`.
+  **Uden `STATS_KEY` i miljøet svarer de 404**, så en frisk deploy lækker intet by default.
+  Enhedslisten udleveres kun bag nøglen, aldrig på det offentlige `/usage`.
+- `log_usage.py` folder tallene ind i den samme Gist som tokens. Briefinger akkumuleres som tokens
+  (delta + reset-detektion); enheds-ID'er **unioneres** — union, ikke sum, så en pilot der kommer
+  igen efter en redeploy tælles én gang. Listens længde *er* antallet af piloter.
+- `/stats` viser lifetime fra Gist'en (serveren læser den read-only via `GIST_ID` — en secret Gist
+  kan læses uden token af den der kender id'et; cachet 5 min for GitHubs 60/t-grænse) plus tallene
+  siden sidste deploy. Er Gist'en utilgængelig, siger siden det og viser resten.
+
+**Fanget under review af egen kode:** hvis `/stats.json` var nede én runde, blev `last_snapshot`
+skrevet som 0, og næste vellykkede runde ville tælle hele perioden **igen**. Derfor tager
+`accumulate_stats()` nu `now` som argument: er endepunktet uden for rækkevidde, videreføres den
+gemte værdi i stedet for 0. Pinnet i `test_stats.py` som en sekvens: ok → ok → nede → ok → redeploy.
+
+**Læring:** en tæller der nulstilles ved redeploy kan ikke summeres på tværs af nulstillinger uden at
+lyve. Enten skal man detektere nulstillingen (som tokens), eller vælge en idempotent operation
+(union, som piloterne) — og så er "endepunktet svarede ikke" et *tredje* tilfælde, der ligner en
+nulstilling, men ikke er det.

@@ -146,6 +146,17 @@
   .note{margin-top:24px;font-size:11.5px;color:var(--faint);line-height:1.6;border-top:1px solid var(--line2);padding-top:14px}
   .fbbtn{margin-left:auto;background:transparent;border:1px solid var(--faint);color:var(--barink);font-family:var(--ui);font-size:12.5px;font-weight:600;border-radius:8px;padding:6px 11px;cursor:pointer}
   .fbbtn:active{opacity:.7}
+  /* The help button sits next to Feedback; only Feedback pushes them right. */
+  .helpbtn{margin-left:auto;background:transparent;border:1px solid var(--faint);color:var(--barink);font-family:var(--ui);font-size:12.5px;font-weight:700;border-radius:8px;width:28px;height:28px;line-height:1;cursor:pointer;padding:0}
+  .helpbtn:active{opacity:.7}
+  .helpbtn+.fbbtn{margin-left:7px}
+  /* How-it-works steps, shown on first launch and from the ? button. */
+  .steps{list-style:none;margin:0;padding:0;counter-reset:s}
+  .steps li{counter-increment:s;position:relative;padding:0 0 15px 38px;font-size:14.5px;color:var(--muted);line-height:1.5}
+  .steps li:last-child{padding-bottom:6px}
+  .steps li::before{content:counter(s);position:absolute;left:0;top:-1px;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-family:var(--mono);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .steps b{display:block;color:var(--ink);font-size:15px;margin-bottom:2px}
+  .steps code{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line2);border-radius:4px;padding:0 4px}
   [hidden]{display:none!important}  /* beat class rules like .fbmodal/.routeedit that set display:flex */
   .fbmodal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center}
   .fbcard{width:100%;max-width:680px;background:var(--panel);border-radius:16px 16px 0 0;padding:16px 15px 20px;max-height:92vh;overflow-y:auto}
@@ -161,7 +172,7 @@
 </style>
 </head>
 <body>
-  <div class="bar"><b>NOTAM&nbsp;&amp;&nbsp;WX&nbsp;<span class="pl">AI</span></b> <span class="tg">Route Briefing</span><button class="fbbtn" id="fbOpen">Feedback</button></div>
+  <div class="bar"><b>NOTAM&nbsp;&amp;&nbsp;WX&nbsp;<span class="pl">AI</span></b> <span class="tg">Route Briefing</span><button class="helpbtn" id="helpOpen" aria-label="How it works" title="How it works">?</button><button class="fbbtn" id="fbOpen">Feedback</button></div>
   <main>
     <h1>New route briefing</h1>
     <div class="field" style="margin-bottom:9px">
@@ -200,6 +211,22 @@
     <div id="out"></div>
     <div class="note" id="note" hidden><strong>Not for operational use.</strong> Live FAA data, AI-shortened. Every dropdown holds the complete original NOTAM verbatim — nothing is deleted, only prioritised, merged or collapsed. Always cross-check your official briefing.</div>
   </main>
+
+  <!-- Shown once on a pilot's first launch, and any time after via the ? button.
+       Three steps because there are exactly three things to do before the button
+       works: name the aerodromes, set the times, (optionally) keep the route. -->
+  <div class="fbmodal" id="helpModal" hidden>
+    <div class="fbcard">
+      <div class="fbhead">How it works<button class="fbx" id="helpClose" aria-label="Close">✕</button></div>
+      <ol class="steps">
+        <li><b>Enter the aerodromes</b>Required: <code>DEP</code> and <code>ARR</code>. Add alternates and enroute fields under <code>ALT / ENROUTE</code>. ICAO or IATA, separated by space or comma.</li>
+        <li><b>Select day, ETD and flight time</b>Pick <code>Today</code> or <code>Tomorrow</code>, then <code>ETD</code> (UTC) and <code>EET</code>. The briefing only keeps what is active in that window — wrong times, wrong NOTAMs.</li>
+        <li><b>Save or edit your routes</b>Tap a route chip to fill the form instantly. Press <code>Edit</code> to save the current route, rename or delete — your routes stay on this device.</li>
+      </ol>
+      <p class="fbctx">Every briefing you build is stored on the device and stays readable offline, in the air. Not for operational use — always cross-check your official briefing.</p>
+      <button class="btn" id="helpGo" style="margin-top:4px">Got it</button>
+    </div>
+  </div>
 
   <div class="fbmodal" id="fbModal" hidden>
     <div class="fbcard">
@@ -319,6 +346,40 @@
       '</details>';
     }).join('');
     note.hidden = false;
+  }
+
+  // ── First launch: how it works ────────────────────────────────────────────
+  // Shown once per device, then only on demand from the ? button. Stored as a
+  // version so a future rewrite of the steps can show itself again.
+  var HKEY='notamwx.helpseen', HVER='1';
+  var helpModal=document.getElementById('helpModal');
+  function helpShow(){ helpModal.hidden=false; }
+  function helpHide(){
+    helpModal.hidden=true;
+    try{ localStorage.setItem(HKEY, HVER); }catch(e){}
+  }
+  document.getElementById('helpOpen').addEventListener('click', helpShow);
+  document.getElementById('helpClose').addEventListener('click', helpHide);
+  document.getElementById('helpGo').addEventListener('click', helpHide);
+  helpModal.addEventListener('click', function(e){ if(e.target===helpModal) helpHide(); });
+  try{ if(localStorage.getItem(HKEY)!==HVER) helpShow(); }catch(e){ helpShow(); }
+
+  // ── Anonymous device id ───────────────────────────────────────────────────
+  // A random string this browser invents for itself, so the server can count
+  // *how many* pilots use the app without knowing *which*. Derived from nothing
+  // — not the IP, not the device, not the pilot — and never leaves this app.
+  // Clearing site data resets it (and that device is then counted as new).
+  function deviceId(){
+    var K='notamwx.device', id=null;
+    try{ id = localStorage.getItem(K); }catch(e){ return ''; }   // private mode
+    if(!id){
+      var a = new Uint8Array(8);
+      (window.crypto||{}).getRandomValues ? crypto.getRandomValues(a)
+        : a.forEach(function(_,i){ a[i]=Math.floor(Math.random()*256); });
+      id = Array.prototype.map.call(a, function(b){ return ('0'+b.toString(16)).slice(-2); }).join('');
+      try{ localStorage.setItem(K, id); }catch(e){ return ''; }
+    }
+    return id;
   }
 
   // ── Saved routes ──────────────────────────────────────────────────────────
@@ -457,7 +518,10 @@
     window.__lastQuery = body;                     // for Feedback context
     out.innerHTML=''; note.hidden=true; btn.disabled=true;
     status.textContent='Fetching live NOTAMs and rewriting… (first call can take ~30s while the free server wakes)';
-    fetch('/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    // `client` rides along only on the wire — it stays out of `body` so it never
+    // ends up in the saved briefing or the feedback context. See deviceId().
+    var wire = JSON.parse(JSON.stringify(body)); wire.client = deviceId();
+    fetch('/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(wire)})
       .then(function(r){
         if(r.status===429){ var re=new Error('rate'); re.rate=true; throw re; }
         if(!r.ok) throw new Error('server '+r.status);

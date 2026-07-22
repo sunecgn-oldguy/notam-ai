@@ -18,19 +18,24 @@ a thin adapter: parse the request, then hand off to the engine.
   /briefing -> briefing.build()   (notam/briefing.py — the whole pipeline)
   /feedback -> feedback.submit()  (notam/feedback.py)
   /usage    -> usage.snapshot()   (notam/usage.py)
+  /stats    -> stats.snapshot()   (notam/stats.py — how many pilots, how many briefings)
   input codes -> airports.to_icao() (notam/airports.py)
 The engine in notam/ is pure stdlib; Flask lives only here. See ARCHITECTURE.md.
 """
 
 from __future__ import annotations
 
+import hmac
+import json
 import os
 import re
+import time
+import urllib.request
 from datetime import datetime, timedelta, timezone
 
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-from notam import briefing, feedback, ratelimit, usage
+from notam import briefing, feedback, ratelimit, stats, usage
 from notam.airports import to_icao
 
 app = Flask(__name__)
@@ -89,6 +94,111 @@ def usage_report():
     return jsonify(usage.snapshot())
 
 
+# --- Usage stats (private). Both routes need ?key=<STATS_KEY>; with no STATS_KEY
+#     set in the environment they 404, so a fresh deploy leaks nothing by default.
+#     /stats.json is what the keep-alive job polls; /stats is the page you read. ---
+
+def _stats_authorised() -> bool:
+    key = os.environ.get("STATS_KEY", "")
+    return bool(key) and hmac.compare_digest(request.args.get("key", ""), key)
+
+
+@app.get("/stats.json")
+def stats_json():
+    """Since-boot counts + the device roster, for .github/scripts/log_usage.py."""
+    if not _stats_authorised():
+        abort(404)
+    return jsonify(stats.snapshot(with_devices=True))
+
+
+@app.get("/stats")
+def stats_page():
+    """Human-readable numbers: lifetime (from the Gist) and since this deploy."""
+    if not _stats_authorised():
+        abort(404)
+    now, life = stats.snapshot(), _lifetime()
+    tok = usage.snapshot()
+
+    def row(label, value, sub=""):
+        return (f'<tr><th>{label}</th><td>{value}</td>'
+                f'<td class="sub">{sub}</td></tr>')
+
+    if life:
+        head = (row("Pilots (unique devices)", life.get("users", "—")) +
+                row("Briefings built", life.get("briefings", "—")) +
+                row("AI calls", life.get("calls", "—")) +
+                row("Tokens", f'{life.get("total", 0):,}'.replace(",", " "),
+                    _cost_dkk(life)))
+        stamp = f'Lifetime · last updated {life.get("updated_at", "—")}'
+    else:
+        head = row("Lifetime", "not available",
+                   "set GIST_ID on the server to read the stored totals")
+        stamp = "Lifetime"
+    body = (row("Pilots (unique devices)", now["devices"]) +
+            row("Briefings built", now["briefings"]) +
+            row("AI calls", tok["calls"]) +
+            row("Tokens", f'{tok["total_tokens"]:,}'.replace(",", " ")))
+    return f"""<!doctype html><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>NOTAM AI — usage</title>
+<style>
+ body{{font:15px/1.5 -apple-system,system-ui,sans-serif;margin:0;padding:22px 16px;
+   background:#0f1115;color:#e8eaed}}
+ h1{{font-size:17px;margin:0 0 18px}} h2{{font-size:12px;letter-spacing:.1em;
+   text-transform:uppercase;color:#8b93a1;margin:22px 0 8px;font-weight:700}}
+ table{{width:100%;max-width:520px;border-collapse:collapse}}
+ th{{text-align:left;font-weight:400;color:#b6bcc7;padding:7px 0}}
+ td{{text-align:right;font-variant-numeric:tabular-nums;font-size:19px;padding:7px 0}}
+ td.sub{{text-align:right;font-size:12px;color:#8b93a1;padding-left:10px;width:1%;
+   white-space:nowrap}}
+ tr+tr th,tr+tr td{{border-top:1px solid #232733}}
+</style>
+<h1>NOTAM &amp; WX AI — usage</h1>
+<h2>{stamp}</h2><table>{head}</table>
+<h2>Since this deploy</h2><table>{body}</table>"""
+
+
+def _cost_dkk(life: dict) -> str:
+    """Rough spend so far, at Claude Haiku 4.5 rates ($1/M in, $5/M out)."""
+    usd = life.get("input", 0) / 1e6 + life.get("output", 0) / 1e6 * 5
+    return f"≈ ${usd:.2f}"
+
+
+_LIFETIME_CACHE: dict = {"at": 0.0, "data": None}
+
+
+def _lifetime() -> dict | None:
+    """Lifetime totals from the secret Gist the keep-alive job writes.
+
+    Read-only and unauthenticated: a secret Gist is readable by anyone holding
+    its ID, so the server needs GIST_ID but not the token that writes it. Cached
+    for 5 minutes — GitHub allows 60 unauthenticated calls an hour, and this page
+    is refreshed by hand. Any failure returns None and the page says so.
+    """
+    gid = os.environ.get("GIST_ID", "")
+    if not gid:
+        return None
+    if _LIFETIME_CACHE["data"] and time.time() - _LIFETIME_CACHE["at"] < 300:
+        return _LIFETIME_CACHE["data"]
+    try:
+        req = urllib.request.Request(
+            f"https://api.github.com/gists/{gid}",
+            headers={"User-Agent": "notam-ai-stats",
+                     "Accept": "application/vnd.github+json"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            gist = json.load(r)
+        state = json.loads(gist["files"]["notam-ai-usage.json"]["content"])
+        out = dict(state.get("lifetime") or {})
+        out["users"] = len(state.get("users") or [])
+        out["briefings"] = (state.get("lifetime") or {}).get("briefings", "—")
+        out["updated_at"] = state.get("updated_at", "—")
+    except Exception:
+        app.logger.exception("could not read lifetime stats from Gist %s", gid)
+        return None
+    _LIFETIME_CACHE.update(at=time.time(), data=out)
+    return out
+
+
 @app.post("/briefing")
 def make_briefing():
     if not _BRIEFING_LIMIT.allow(_client_key()):
@@ -97,6 +207,7 @@ def make_briefing():
             "message": "Too many briefings this hour. Please wait a bit and try again.",
         }), 429
     data = request.get_json(force=True, silent=True) or {}
+    stats.record(data.get("client", ""))   # anonymous usage count; see notam/stats.py
     # Last line of defence: whatever breaks downstream, the pilot gets a readable
     # reason instead of Flask's bare HTML 500 page. The traceback goes to the
     # Render log so the cause is findable after the fact.

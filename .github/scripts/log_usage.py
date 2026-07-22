@@ -12,10 +12,19 @@ snapshot's call count is lower than the last one we saw, a redeploy happened, so
 the whole current snapshot counts as new usage (the <10 min tail before the
 redeploy is lost — an acceptable approximation for a lifetime figure).
 
+The same run also folds in the anonymous usage counters from /stats.json (see
+notam/stats.py): briefings are accumulated exactly like tokens, while the device
+roster is UNIONED into a stored set — union, not sum, so a pilot who comes back
+after a redeploy is still one pilot. That set's length is the "how many people
+use this" number.
+
 Config via env (set as GitHub repo secrets):
   APP_URL     base URL of the app (e.g. https://notam-ai.onrender.com)
   GIST_ID     id of a secret Gist holding notam-ai-usage.json
   GIST_TOKEN  a Personal Access Token with the 'gist' scope
+  STATS_KEY   same value as the server's STATS_KEY (unlocks /stats.json).
+              Optional: without it, token logging still works and only the
+              pilot/briefing counters are skipped.
 Missing config or transient errors are non-fatal — the run is skipped, never
 failed, so the keep-alive ping is never affected.
 """
@@ -28,6 +37,7 @@ from datetime import datetime, timezone
 APP_URL = os.environ.get("APP_URL", "").rstrip("/")
 GIST_ID = os.environ.get("GIST_ID", "")
 GIST_TOKEN = os.environ.get("GIST_TOKEN", "")
+STATS_KEY = os.environ.get("STATS_KEY", "")
 FILENAME = "notam-ai-usage.json"
 _FIELDS = ("calls", "input", "output")
 
@@ -44,6 +54,27 @@ def accumulate(life: dict, last: dict, cur: dict):
     new = {k: life.get(k, 0) + delta[k] for k in _FIELDS}
     new["total"] = new["input"] + new["output"]
     return new, delta, reset
+
+
+def accumulate_stats(state: dict, cur: dict, now: int):
+    """Fold one /stats.json snapshot into the stored pilot/briefing counters.
+
+    Briefings behave like tokens (accumulate a delta, reset detected by a drop).
+    Devices do not: we keep the union of every ID ever seen, so the count is
+    genuinely "distinct pilots", not "pilots per deploy summed up".
+
+    `now` is passed in rather than read from `cur` because when /stats.json is
+    unreachable the caller substitutes the stored value — otherwise the next
+    successful poll would see 0 -> N and count the whole run a second time.
+
+    Returns (users, briefings_total, new_users, briefings_delta).
+    """
+    users = set(state.get("users") or []) | set(cur.get("device_ids") or [])
+    new_users = len(users) - len(state.get("users") or [])
+    last = int((state.get("last_snapshot") or {}).get("briefings", 0))
+    delta = now if now < last else now - last          # drop => redeploy
+    total = int((state.get("lifetime") or {}).get("briefings", 0)) + delta
+    return sorted(users), total, new_users, delta
 
 
 def _get_json(url, headers, timeout=30):
@@ -71,6 +102,16 @@ def main():
            "input": int(snap.get("input_tokens", 0)),
            "output": int(snap.get("output_tokens", 0))}
 
+    # 1b. anonymous pilot/briefing counters (needs STATS_KEY; optional)
+    stats = {}
+    if STATS_KEY:
+        try:
+            stats = _get_json(f"{APP_URL}/stats.json?key={STATS_KEY}",
+                              {"User-Agent": "notam-ai-usage-log"})
+        except Exception as e:                # 404 = key mismatch or old deploy
+            print(f"[usage-log] stats unavailable ({e}) — logging tokens only")
+    cur["briefings"] = int(stats.get("briefings", 0))
+
     gh = {"Authorization": f"Bearer {GIST_TOKEN}",
           "Accept": "application/vnd.github+json",
           "User-Agent": "notam-ai-usage-log"}
@@ -90,18 +131,26 @@ def main():
             state = {}
     life = state.get("lifetime", {})
     last = state.get("last_snapshot", {})
+    if not stats:            # endpoint unreachable: carry the stored count so
+        cur["briefings"] = int(last.get("briefings", 0))   # no delta is invented
 
     # 3. fold in the new snapshot
     new_life, delta, reset = accumulate(life, last, cur)
-    if sum(delta.values()) == 0 and last == cur:
+    users, briefings, new_users, br_delta = accumulate_stats(
+        state, stats, cur["briefings"])
+    new_life["briefings"] = briefings
+    if sum(delta.values()) == 0 and last == cur and not new_users and not br_delta:
         print("[usage-log] no change since last poll — nothing to write")
         return
 
     new_state = {
         "lifetime": new_life,
         "last_snapshot": cur,
+        "users": users,
         "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "note": "Lifetime AI-token usage across all redeploys. Written by keepalive.yml.",
+        "note": ("Lifetime usage across all redeploys, written by keepalive.yml. "
+                 "'users' is the union of anonymous device IDs — its length is the "
+                 "number of distinct pilots who have used the app."),
     }
     body = json.dumps(
         {"files": {FILENAME: {"content": json.dumps(new_state, indent=2)}}}).encode()
@@ -117,6 +166,8 @@ def main():
 
     tag = "reset detected, added full snapshot" if reset else "added delta"
     print(f"[usage-log] {tag}: +{delta} -> lifetime {new_life}")
+    print(f"[usage-log] pilots {len(users)} (+{new_users}), "
+          f"briefings {briefings} (+{br_delta})")
 
 
 if __name__ == "__main__":

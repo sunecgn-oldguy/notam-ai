@@ -41,4 +41,5 @@ jobs:
           APP_URL: https://notam-ai.onrender.com
           GIST_ID: ${{ secrets.GIST_ID }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          STATS_KEY: ${{ secrets.STATS_KEY }}   # same value as the server's STATS_KEY
         run: python3 .github/scripts/log_usage.py

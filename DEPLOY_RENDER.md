@@ -27,6 +27,15 @@ Opret et tomt repo på github.com, og følg deres to linjer (`git remote add …
 3. **Environment → Add Environment Variable:**
    - `ANTHROPIC_API_KEY` = din nøgle (fra console.anthropic.com)
    - `NOTAM_LLM` = `claude`  *(eller lad den være tom/`none` indtil du vil tænde AI'en)*
+   - `STATS_KEY` = en selvvalgt streng (fx 20 tilfældige tegn). Låser op for
+     `/stats` og `/stats.json`. **Uden den svarer begge sider 404** — så en ny
+     deploy lækker intet, men du får heller ingen brugertal.
+   - `GIST_ID` = id'et på den hemmelige Gist (samme som GitHub-secreten). Kun
+     for at `/stats` kan vise lifetime-tallene; udelades den, viser siden blot
+     tallene siden sidste deploy.
+
+   Sæt **samme `STATS_KEY`** som repo-secret på GitHub (Settings → Secrets →
+   Actions), så keep-alive-jobbet kan læse tællerne og gemme dem varigt.
 4. Vælg **Free** for at teste (går i dvale ved inaktivitet — første kald ~30 sek;
    keep-alive-workflow'et holder den vågen gratis). Renders billige faste plan er
    udgået — næste betalte trin er ~$25/md, så bliv på Free til prototypen.
@@ -43,6 +52,17 @@ curl -X POST https://DIN-APP.onrender.com/briefing \
   -H "Content-Type: application/json" \
   -d '{"dep":"EDDK","arr":"LFML","alt":"LFMN","etd":"0800","eet":"0130"}'
 ```
+
+## Se hvor mange der bruger appen
+
+```
+https://DIN-APP.onrender.com/stats?key=DIN-STATS-KEY
+```
+
+Viser antal piloter (unikke enheder), antal briefinger, AI-kald og tokens —
+både lifetime (fra Gist'en) og siden sidste deploy. Tallet for piloter bygger på
+et tilfældigt ID, browseren selv finder på og gemmer lokalt; det er ikke afledt
+af IP, telefon eller person, så det svarer på *hvor mange*, aldrig *hvem*.
 
 ## Nøglen er sikker
 
