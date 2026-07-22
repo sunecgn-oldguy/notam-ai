@@ -230,6 +230,35 @@ PROMPT="Aurora"; document.getElementById("addAirline").fire("click");
 ok("new menus sort alphabetically behind Star Air",
    FLEETS.airlines.map(function(a){ return a.name; }), ["Star Air","Aurora","Zulu"]);
 
+// --- what's new -------------------------------------------------------------
+// The app updates itself, so this is the only thing that tells a pilot what
+// changed. It must appear exactly once per release — and never to someone
+// opening the app for the first time, who has nothing to compare against.
+var newsModal=document.getElementById("newsModal"), newsBody=document.getElementById("newsBody");
+var LATEST=RELEASES[0].v;
+
+_ls["notamwx.release"]="2020-01-01";        // a pilot still on an older build
+newsModal.hidden=true;
+ok("a returning pilot is shown the release note", newsDecide(false), true);
+ok("...and it lists what actually changed",
+   [newsModal.hidden, newsBody.innerHTML.indexOf("aerodrome field")>0], [false, true]);
+
+document.getElementById("newsGo").fire("click");
+ok("dismissing it stores the version",
+   [newsModal.hidden, _ls["notamwx.release"]], [true, LATEST]);
+ok("...so it does not come back", newsDecide(false), false);
+
+delete _ls["notamwx.release"];
+ok("a brand-new pilot is not shown it", newsDecide(true), false);
+ok("...but it is marked read, so they see the NEXT release",
+   _ls["notamwx.release"], LATEST);
+
+// Still reachable on purpose, from the help screen.
+document.getElementById("newsOpen").fire("click");
+ok("the help screen can open it any time",
+   [newsModal.hidden, document.getElementById("helpModal").hidden], [false, true]);
+newsModal.hidden=true;
+
 print("\nALL PASSED");
 """
 

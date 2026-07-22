@@ -678,3 +678,29 @@ som virkeligheden aldrig producerer. Fjernes de to `addEventListener`-linjer, fe
 **Læring:** testen bestod, mens appen var i stykker, fordi testens *hændelse* ikke var pilotens
 hændelse. `change` med tom værdi kan simuleres, men opstår aldrig i en menu uden valgmuligheder. Når
 man stubber DOM'en, skal man teste den interaktion brugeren har — ikke den, der er nemmest at kalde.
+
+## 2026-07-22 (8) — "What's new" i appen i stedet for en mailliste
+
+Piloten spurgte om en "sign up for new versions"-mailliste. **Den løser ikke problemet:** appen er en
+PWA, så servicearbejderen henter selv den nye version — brugerne *har* allerede seneste build uden at
+gøre noget. Det de mangler er ikke koden, men at vide **hvad** der er ændret. Det hører hjemme i
+appen, ikke i en indbakke.
+
+**Fravalgt bevidst (mailliste):** en mailadresse er persondata (formål, samtykke, framelding,
+sletning — GDPR gælder også ved ti brugere), Renders disk er flygtig så listen skulle ligge i en
+Gist eller mailes ved hver tilmelding, og hver udgivelsesmail skal skrives i hånden. Til gengæld er
+mail det eneste, der virker, når man skal nå folk der *ikke* har appen åben — altså ved
+App Store-lanceringen. Gemt til da. Feedback-formularen indsamler i forvejen valgfri mailadresse.
+
+**Bygget:** `RELEASES`-array øverst i scriptet. Ny udgivelse = én ny post i toppen med et nyt `v`;
+intet andet skal ændres. Vises én gang pr. enhed, kan altid hentes frem igen fra `?`-skærmen.
+
+**Det subtile sted — en helt ny pilot skal IKKE se den.** For dem er intet ændret; de har aldrig set
+den gamle version. Havde jeg blot sammenlignet gemt version med nyeste, ville enhver førstegangs­bruger
+få både onboarding og en liste over ændringer, de ikke kan relatere til. `newsDecide(isFirstRun)`
+markerer i stedet udgivelsen som læst **uden** at vise den, så de først ser noget, når der næste gang
+udgives noget. Begge grene er pinnet, og mutationstesten fanger dem hver for sig (både "vis den til
+førstegangsbrugere" og "undlad at markere den læst").
+
+`sw.js` bumpet til v3: en gammel cache ville vise udgivelsesnoten én opstart senere end den påstår.
+42 frontend-assertions, seks nye mutationer fanget.

@@ -9,7 +9,9 @@
    - App shell ("/", manifest, icons): cache-first, refreshed in the background.
    - Everything else (incl. POST /briefing, /feedback): straight to network —
      never cached, never intercepted offline. */
-const CACHE = "notamwx-shell-v2";   // v2: how-it-works overlay + usage counter
+const CACHE = "notamwx-shell-v3";   // v3: what's-new box. Bump on every shell
+                                    // change — a stale cache would show the
+                                    // release note a launch later than it says.
 const SHELL = ["/", "/manifest.json", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", function (e) {
