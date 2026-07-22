@@ -49,8 +49,9 @@ function fetch(){ var t={ then:function(){return t;}, catch:function(){return t;
   finally:function(){return t;} }; return t; }
 function setTimeout(){ return 0; }
 function alert(m){ LOG.push('alert:'+m); }
-function prompt(){ return 'TESTROUTE'; }
-function confirm(){ return true; }
+var PROMPT='TESTROUTE', CONFIRM=true;   // what the pilot "types" / "clicks"
+function prompt(){ return PROMPT; }
+function confirm(){ return CONFIRM; }
 """
 
 TESTS = r"""
@@ -100,6 +101,83 @@ LOG.length=0; ads.value="CPH";
 document.getElementById("go").fire("click");
 ok("one aerodrome blocks the request and focuses the field",
    LOG.indexOf("focus:ads")>=0, true);
+
+// --- airlines: every operator keeps its own list ----------------------------
+var airlineEl=document.getElementById("airline"), routeEl=document.getElementById("routeSel");
+function names(el){                       // the visible labels of a pick-list
+  var out=[], re=/<option[^>]*>([^<]*)</g, m;
+  while((m=re.exec(el.innerHTML))) out.push(m[1]);
+  return out;
+}
+
+ok("seeded with Star Air only", names(airlineEl), ["Star Air"]);
+ok("its routes are listed", names(routeEl).indexOf("CGN–BER")>0, true);
+
+// Picking a route fills the aerodrome field.
+routeEl.value="CGN–BER"; routeEl.fire("change");
+ok("choosing a route fills the form", ads.value.indexOf("CGN BER")===0, true);
+
+// A pilot at another operator adds their own airline; it starts empty.
+PROMPT="SAS"; document.getElementById("addAirline").fire("click");
+ok("new airline appears and is selected", [names(airlineEl), FLEETS.active],
+   [["SAS","Star Air"], "SAS"]);
+ok("...with no routes of its own", routes().length, 0);
+ok("...and the route menu says so", names(routeEl), ["— no routes yet —"]);
+
+// Saving a route puts it under the selected airline, not Star Air.
+ads.value="CPH ARN OSL"; PROMPT="CPH-ARN";
+document.getElementById("addRoute").fire("click");
+ok("route saved to the active airline", routes().length, 1);
+ok("Star Air untouched",
+   FLEETS.airlines.filter(function(a){ return a.name==="Star Air"; })[0].routes.length, 12);
+ok("saved route round-trips", routes()[0], {label:"CPH-ARN", dep:"CPH", arr:"ARN", enr:"OSL"});
+
+// The pilot's own routes have to survive closing the app, so check what
+// actually reached storage — not just the copy in memory.
+ok("everything persists to localStorage", (function(){
+     var f=loadFleets(), sas=f.airlines.filter(function(a){ return a.name==="SAS"; })[0];
+     return [f.active, sas?sas.routes.length:-1, sas?sas.routes[0].label:""];
+   })(), ["SAS", 1, "CPH-ARN"]);
+
+// Switching airline switches the menu.
+airlineEl.value="Star Air"; airlineEl.fire("change");
+ok("switching airline swaps the route list", names(routeEl).length, 13);
+
+// Saving goes to the airline on screen, even when it is not the first one.
+ads.value="EKCH EKVG"; PROMPT="CPH-FAE";
+document.getElementById("addRoute").fire("click");
+ok("a route lands in the selected airline, not the first",
+   [routes().length,
+    FLEETS.airlines.filter(function(a){ return a.name==="SAS"; })[0].routes.length],
+   [13, 1]);
+
+// ...and deleting one takes it from the same place.
+CONFIRM=true; document.getElementById("delRoute").fire("click");
+ok("deleting a route only touches the airline on screen",
+   [routes().length,
+    FLEETS.airlines.filter(function(a){ return a.name==="SAS"; })[0].routes.length],
+   [12, 1]);
+LOG.length=0; document.getElementById("delRoute").fire("click");
+ok("with no route selected, delete asks instead of guessing",
+   LOG.length===1 && LOG[0].indexOf("alert:")===0, true);
+
+// Deleting an airline takes its routes with it, and never leaves you with none.
+airlineEl.value="SAS"; airlineEl.fire("change");
+CONFIRM=true; document.getElementById("delAirline").fire("click");
+ok("airline deleted", names(airlineEl), ["Star Air"]);
+ok("...and the deletion is stored", loadFleets().airlines.length, 1);
+document.getElementById("delAirline").fire("click");
+ok("the last airline cannot be deleted", names(airlineEl), ["Star Air"]);
+
+// A pilot who edited the old flat list keeps those edits after the upgrade.
+ok("v1 routes migrate into Star Air",
+   (function(){
+     var mine=[{label:"MY-ROUTE", dep:"EKVG", arr:"EKCH", enr:""}];
+     _ls["notamwx.airlines.v2"]=undefined; delete _ls["notamwx.airlines.v2"];
+     _ls["notamwx.routes.v1"]=JSON.stringify(mine);
+     var f=loadFleets();
+     return [f.airlines.length, f.airlines[0].name, f.airlines[0].routes[0].label];
+   })(), [1, "Star Air", "MY-ROUTE"]);
 
 print("\nALL PASSED");
 """

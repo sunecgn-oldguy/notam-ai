@@ -180,12 +180,22 @@
   <div class="bar"><b>NOTAM&nbsp;&amp;&nbsp;WX&nbsp;<span class="pl">AI</span></b> <span class="tg">Route Briefing</span><button class="helpbtn" id="helpOpen" aria-label="How it works" title="How it works">?</button><button class="fbbtn" id="fbOpen">Feedback</button></div>
   <main>
     <h1>New route briefing</h1>
+    <!-- Routes live under an airline, so a pilot at another operator keeps their
+         own list instead of editing someone else's. Two pick-lists rather than a
+         row of chips: a full route network is dozens of legs, and chips only fit
+         a handful before they scroll off a phone. -->
     <div class="field" style="margin-bottom:9px">
-      <div class="rowlabel"><label>Starair Routes <span>· tap to fill · press Edit to modify routes</span></label><button type="button" class="linkbtn" id="editRoutes">Edit</button></div>
-      <div class="routes" id="routes"></div>
+      <div class="rowlabel"><label>Saved routes <span>· pick to fill the form</span></label><button type="button" class="linkbtn" id="editRoutes">Edit</button></div>
+      <div class="row2" style="margin-bottom:0">
+        <div class="field" style="margin-bottom:0"><select class="plain" id="airline" aria-label="Airline"></select></div>
+        <div class="field" style="margin-bottom:0"><select class="plain" id="routeSel" aria-label="Route"></select></div>
+      </div>
       <div class="routeedit" id="routeEdit" hidden>
         <button type="button" class="minibtn" id="addRoute">＋ Save current as route</button>
-        <button type="button" class="minibtn ghost" id="resetRoutes">Reset to Starair</button>
+        <button type="button" class="minibtn ghost" id="delRoute">Delete route</button>
+        <button type="button" class="minibtn ghost" id="addAirline">＋ New airline</button>
+        <button type="button" class="minibtn ghost" id="delAirline">Delete airline</button>
+        <button type="button" class="minibtn ghost" id="resetRoutes">Reset to Star Air</button>
       </div>
     </div>
     <!-- One field, because on a phone three are three chances to tab into the
@@ -228,7 +238,7 @@
       <ol class="steps">
         <li><b>Type the aerodromes in flight order</b>One field: the first is your <b>departure</b>, the second your <b>arrival</b>, and everything after is <b>enroute</b> — alternates, tech stops, whatever you want briefed. IATA or ICAO, mixed freely: <code>CPH BER LGAV EDDK</code>. The line under the field always shows what the app understood.</li>
         <li><b>Select day, ETD and flight time</b>Pick <code>Today</code> or <code>Tomorrow</code>, then <code>ETD</code> (UTC) and <code>EET</code>. The briefing only keeps what is active in that window — wrong times, wrong NOTAMs.</li>
-        <li><b>Save or edit your routes</b>Tap a route chip to fill the form instantly. Press <code>Edit</code> to save the current route, rename or delete — your routes stay on this device.</li>
+        <li><b>Save or edit your routes</b>Pick your airline, then a route, and the form fills itself. Press <code>Edit</code> to save what you have typed as a route, delete one, or add your own airline — flying for someone other than Star Air, build your own list. Everything stays on this device.</li>
       </ol>
       <p class="fbctx">Every briefing you build is stored on the device and stays readable offline, in the air. Not for operational use — always cross-check your official briefing.</p>
       <button class="btn" id="helpGo" style="margin-top:4px">Got it</button>
@@ -440,21 +450,48 @@
     {label:"CGN–VIE", dep:"CGN", arr:"VIE",     enr:"HHN BRU LGG LUX"}
   ];
 
-  // Personal list = the defaults, or this device's saved edits if any.
-  var RKEY = 'notamwx.routes.v1';
-  function loadRoutes(){
+  // Routes belong to an airline: Star Air ships as the seed, and a pilot at any
+  // other operator adds their own instead of editing someone else's list. Stored
+  // per device (localStorage) — no login, no server, private to the phone.
+  //   {v:2, active:"Star Air", airlines:[{name, routes:[{label,dep,arr,enr}]}]}
+  var SEED_AIRLINE = 'Star Air';
+  var RKEY = 'notamwx.routes.v1';        // v1: one flat list, Star Air only
+  var FKEY = 'notamwx.airlines.v2';      // v2: routes grouped by airline
+
+  function loadFleets(){
     try{
-      var raw = localStorage.getItem(RKEY);
-      if(raw){ var a = JSON.parse(raw); if(Array.isArray(a) && a.length) return a; }
+      var raw = localStorage.getItem(FKEY);
+      if(raw){
+        var f = JSON.parse(raw);
+        if(f && f.airlines && f.airlines.length) return f;
+      }
+      // First run after the upgrade: a pilot may have spent time editing the old
+      // flat list, so carry it over as their Star Air rather than discarding it.
+      var old = localStorage.getItem(RKEY);
+      if(old){
+        var a = JSON.parse(old);
+        if(Array.isArray(a) && a.length)
+          return {v:2, active:SEED_AIRLINE, airlines:[{name:SEED_AIRLINE, routes:a}]};
+      }
     }catch(e){}
-    return DEFAULT_ROUTES.slice();
+    return {v:2, active:SEED_AIRLINE,
+            airlines:[{name:SEED_AIRLINE, routes:DEFAULT_ROUTES.slice()}]};
   }
-  function saveRoutes(){ try{ localStorage.setItem(RKEY, JSON.stringify(ROUTES)); }catch(e){} }
-  var ROUTES = loadRoutes();
+  function saveFleets(){ try{ localStorage.setItem(FKEY, JSON.stringify(FLEETS)); }catch(e){} }
+
+  var FLEETS = loadFleets();
   var editMode = false, activeLabel = null;
 
+  function airline(){                       // the currently selected airline
+    for(var i = 0; i < FLEETS.airlines.length; i++)
+      if(FLEETS.airlines[i].name === FLEETS.active) return FLEETS.airlines[i];
+    FLEETS.active = FLEETS.airlines[0].name;
+    return FLEETS.airlines[0];
+  }
+  function routes(){ return airline().routes; }
+
   function lastCode(s){ var t = (s||'').trim().split(/\s+/); return t[t.length-1] || ''; }
-  function sortRoutes(){ ROUTES.sort(function(a,b){ return lastCode(a.arr).localeCompare(lastCode(b.arr)); }); }
+  function sortRoutes(){ routes().sort(function(a,b){ return lastCode(a.arr).localeCompare(lastCode(b.arr)); }); }
 
   // Saved routes keep the old dep/arr/alt/enr shape — a stored route is data a
   // pilot may have edited by hand, so we read it as-is and only flatten it into
@@ -467,54 +504,105 @@
     adRead();
   }
 
-  var routesEl = document.getElementById('routes');
+  var airlineEl = document.getElementById('airline');
+  var routeEl = document.getElementById('routeSel');
   var editBtn = document.getElementById('editRoutes');
   var routeEdit = document.getElementById('routeEdit');
 
-  function renderRoutes(){
-    routesEl.innerHTML = ROUTES.map(function(r, i){
-      var active = r.label === activeLabel ? ' active' : '';
-      var chip = '<button type="button" class="rchip'+active+'" data-i="'+i+'">'+esc(r.label)+'</button>';
-      if(!editMode) return chip;
-      return '<span class="rwrap">'+chip+'<button type="button" class="rdel" data-del="'+i+'" '+
-             'aria-label="Delete '+esc(r.label)+'">×</button></span>';
-    }).join('');
+  function opt(value, text, sel){
+    return '<option value="'+esc(value)+'"'+(sel?' selected':'')+'>'+esc(text)+'</option>';
   }
 
-  routesEl.addEventListener('click', function(e){
-    var del = e.target.closest('.rdel');
-    if(del){ ROUTES.splice(+del.dataset.del, 1); saveRoutes(); renderRoutes(); return; }
-    var b = e.target.closest('.rchip'); if(!b) return;
-    var r = ROUTES[+b.dataset.i];
-    applyRoute(r); activeLabel = r.label; renderRoutes();
+  function renderRoutes(){
+    airlineEl.innerHTML = FLEETS.airlines.map(function(a){
+      return opt(a.name, a.name, a.name === FLEETS.active);
+    }).join('');
+    var rs = routes();
+    routeEl.innerHTML = opt('', rs.length ? '— select route —' : '— no routes yet —',
+                            !activeLabel) +
+      rs.map(function(r){ return opt(r.label, r.label, r.label === activeLabel); }).join('');
+    routeEl.disabled = !rs.length;
+  }
+
+  airlineEl.addEventListener('change', function(){
+    FLEETS.active = airlineEl.value;
+    activeLabel = null;                    // a route from another airline no longer applies
+    saveFleets(); renderRoutes();
+  });
+
+  routeEl.addEventListener('change', function(){
+    var label = routeEl.value;
+    if(!label){ activeLabel = null; return; }
+    var rs = routes();
+    for(var i = 0; i < rs.length; i++)
+      if(rs[i].label === label){ applyRoute(rs[i]); activeLabel = label; return; }
   });
 
   editBtn.addEventListener('click', function(){
     editMode = !editMode;
     editBtn.textContent = editMode ? 'Done' : 'Edit';
     routeEdit.hidden = !editMode;
-    renderRoutes();
   });
 
-  // Save what's in the aerodrome field as a route (overwrites one with the same name).
+  // Save what's in the aerodrome field as a route of the selected airline
+  // (overwrites one with the same name).
   document.getElementById('addRoute').addEventListener('click', function(){
     var r = adRoles();
     if(!r.dep || !r.arr){ alert('Enter at least a departure and an arrival first, then save.'); return; }
-    var label = prompt('Route name (chip label):', activeLabel || (r.dep + '–' + r.arr));
+    var label = prompt('Route name, as it will appear in the ' + airline().name + ' menu:',
+                       activeLabel || (r.dep + '–' + r.arr));
     if(label === null) return;
     label = label.trim(); if(!label) return;
     var route = {label: label, dep: r.dep, arr: r.arr, enr: r.enr.join(' ')};
-    var idx = -1;
-    for(var i = 0; i < ROUTES.length; i++){ if(ROUTES[i].label.toLowerCase() === label.toLowerCase()){ idx = i; break; } }
-    if(idx >= 0) ROUTES[idx] = route; else ROUTES.push(route);
-    sortRoutes(); saveRoutes(); activeLabel = label;
+    var rs = routes(), idx = -1;
+    for(var i = 0; i < rs.length; i++){ if(rs[i].label.toLowerCase() === label.toLowerCase()){ idx = i; break; } }
+    if(idx >= 0) rs[idx] = route; else rs.push(route);
+    sortRoutes(); saveFleets(); activeLabel = label;
     editMode = false; editBtn.textContent = 'Edit'; routeEdit.hidden = true;  // saving implies done
     renderRoutes();
   });
 
+  document.getElementById('delRoute').addEventListener('click', function(){
+    if(!activeLabel){ alert('Pick the route you want to delete first.'); return; }
+    if(!confirm('Delete the route "' + activeLabel + '" from ' + airline().name + '?')) return;
+    var rs = routes();
+    for(var i = 0; i < rs.length; i++)
+      if(rs[i].label === activeLabel){ rs.splice(i, 1); break; }
+    activeLabel = null; saveFleets(); renderRoutes();
+  });
+
+  document.getElementById('addAirline').addEventListener('click', function(){
+    var name = prompt('Airline name (e.g. SAS). Its routes start empty — build them with “Save current as route”.', '');
+    if(name === null) return;
+    name = name.trim(); if(!name) return;
+    for(var i = 0; i < FLEETS.airlines.length; i++){
+      if(FLEETS.airlines[i].name.toLowerCase() === name.toLowerCase()){
+        FLEETS.active = FLEETS.airlines[i].name;         // already there: just switch to it
+        activeLabel = null; saveFleets(); renderRoutes(); return;
+      }
+    }
+    FLEETS.airlines.push({name: name, routes: []});
+    FLEETS.airlines.sort(function(a, b){ return a.name.localeCompare(b.name); });
+    FLEETS.active = name; activeLabel = null; saveFleets(); renderRoutes();
+  });
+
+  document.getElementById('delAirline').addEventListener('click', function(){
+    if(FLEETS.airlines.length < 2){ alert('This is your only airline — it cannot be deleted.'); return; }
+    var a = airline();
+    if(!confirm('Delete ' + a.name + ' and its ' + a.routes.length + ' route(s)?')) return;
+    FLEETS.airlines = FLEETS.airlines.filter(function(x){ return x !== a; });
+    FLEETS.active = FLEETS.airlines[0].name;
+    activeLabel = null; saveFleets(); renderRoutes();
+  });
+
   document.getElementById('resetRoutes').addEventListener('click', function(){
-    if(!confirm('Reset to the Starair default routes? Your own changes will be lost.')) return;
-    ROUTES = DEFAULT_ROUTES.slice(); saveRoutes(); activeLabel = null; renderRoutes();
+    if(!confirm('Restore the ' + SEED_AIRLINE + ' default routes? Your own changes to that airline will be lost. Other airlines are untouched.')) return;
+    var found = false;
+    FLEETS.airlines.forEach(function(a){
+      if(a.name === SEED_AIRLINE){ a.routes = DEFAULT_ROUTES.slice(); found = true; }
+    });
+    if(!found) FLEETS.airlines.unshift({name: SEED_AIRLINE, routes: DEFAULT_ROUTES.slice()});
+    FLEETS.active = SEED_AIRLINE; activeLabel = null; saveFleets(); renderRoutes();
   });
 
   renderRoutes();

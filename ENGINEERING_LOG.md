@@ -570,3 +570,36 @@ fjern ARR-advarslen, ødelæg rute-udfyldningen).
 
 **Læring:** en test der ikke kan fejle, tester ikke noget. Mutationstesten tog to minutter og fandt
 et hul i testen på første forsøg.
+
+## 2026-07-22 (4) — Ruter hører til et flyselskab
+
+Rutelisten var Star Airs, hårdt indbygget. En pilot i et andet selskab kunne kun redigere en andens
+liste. Nu: **selskab → rute**, to rullemenuer. Star Air er seed'et; brugeren kan tilføje sit eget
+(fx SAS) med sine egne ruter, og de to lister rører ikke hinanden.
+
+**Hvorfor rullemenuer og ikke chips:** et rutenet er snesevis af strækninger. Chips fyldte skærmen
+og scrollede vandret ud af syne efter en håndfuld; en menu er konstant høj uanset antallet.
+
+**Datamodel** (localStorage, `notamwx.airlines.v2`):
+`{v:2, active:"Star Air", airlines:[{name, routes:[{label,dep,arr,enr}]}]}`.
+Rutens eget format er uændret, så alt det tidligere arbejde med `applyRoute()` gælder stadig.
+
+**Migrering er det kritiske sted:** den gamle nøgle (`notamwx.routes.v1`) kan indeholde ruter, en
+pilot selv har brugt tid på at rette. Ved første indlæsning uden v2-data læses v1 og pakkes ind som
+brugerens Star Air i stedet for at blive kasseret. Pinnet i test.
+
+**Mutationstesten fandt tre huller i mine egne tests** (bryd koden med vilje, se om testen opdager
+det). Alle tre var reelle:
+1. **Ingen test rørte `saveFleets()`s resultat** — kun kopien i hukommelsen. Fjernede man
+   `localStorage.setItem`, bestod alt: pilotens ruter ville forsvinde ved næste åbning uden at én
+   test klagede. Nu læses lageret tilbage med `loadFleets()`.
+2. **"Gem rute" blev kun testet, når det aktive selskab tilfældigvis var det første i listen**, så
+   `routes()` og `airlines[0].routes` var samme objekt. Testen kunne ikke se forskel. Nu gemmes der
+   med et ikke-første selskab valgt.
+3. **Sletning af enkelt-ruter var slet ikke testet.**
+
+Efter rettelserne fanges alle otte mutationer. 30 frontend-assertions i alt.
+
+**Læring:** mutationstest afslører ikke fejl i koden — den afslører fejl i *testene*. To af de tre
+huller her var tests, der så ud til at dække noget, men målte et objekt, der ved et tilfælde var det
+rigtige. Det havde ingen kodegennemgang fanget.
