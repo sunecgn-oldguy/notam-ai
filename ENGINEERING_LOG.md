@@ -741,7 +741,21 @@ kvoten kan være opbrugt af fremmede. Det er derfor lifetime-tallene på `/stats
 "not available". Med token: 5000 kald i timen. Bruges kun til læsning.
 *Allerede sat: `STATS_KEY`, `GIST_ID`, `ANTHROPIC_API_KEY`, `NOTAM_LLM`, `FEEDBACK_*`.*
 
-**2. Bekræft at brugertællingen lander i Gist'en**
+**2. Brugertællingen lander IKKE endnu — én ting at tjekke**
+Din manuelle kørsel virkede: Gist'en blev skrevet kl. 21:44 UTC, og token-tallene voksede (1112
+kald, 830.952 tokens). **Men `pilots` og `briefings` blev skrevet som 0**, selvom serveren på det
+tidspunkt havde 2 piloter og 2 briefinger i hukommelsen. Det betyder, at jobbet kunne skrive til
+Gist'en, men **ikke kunne læse `/stats.json` fra appen** — altså at `STATS_KEY` på GitHub ikke er
+identisk med den på Render. Mest sandsynligt et mellemrum eller linjeskift, der er kommet med ved
+indsætningen.
+
+Tjek: GitHub → Actions → keep-alive → nyeste kørsel → fold `usage` ud. Står der
+`[usage-log] stats unavailable (HTTP Error 404 ...)`, er det bekræftet — så slet secreten
+`STATS_KEY` og opret den igen med præcis `Tsdvj6dlSKUpt9yY9KFEVjUum9vcnAxO` (uden mellemrum
+foran/bagefter). Står der derimod `[usage-log] pilots N`, virker det, og tallene var bare nul, fordi
+serveren lige var redeployet.
+
+**2b. Bekræft bagefter**
 GitHub → Actions → keep-alive → nyeste kørsel → fold `usage` ud. Der skal stå
 `[usage-log] pilots N (+n), briefings N (+n)`. Står der en `skip:`-linje, er årsagen skrevet der.
 Bemærk: brug **"Run workflow"**, aldrig "Re-run jobs" — en re-run kører koden fra dét gamle commit
