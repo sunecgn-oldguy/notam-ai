@@ -49,6 +49,11 @@
   .plain{font-family:var(--ui)!important;text-transform:none!important;letter-spacing:0!important;font-size:15px!important}
   .hint{font-size:11.5px;color:var(--faint);margin:2px 2px 16px}
   .hint code{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line2);border-radius:4px;padding:0 4px}
+  .hint b{color:var(--muted);font-weight:600}
+  /* The live reading of what was typed: roles in the accent, codes in mono. */
+  .hint.read{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.04em}
+  .hint.read i{font-style:normal;color:var(--accent);font-weight:700}
+  .hint.read s{text-decoration:none;color:var(--faint)}
   .routes{display:flex;gap:8px;overflow-x:auto;padding:1px 2px 2px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   .routes::-webkit-scrollbar{display:none}
   .rchip{flex:0 0 auto;cursor:pointer;font-family:var(--ui);font-size:13px;font-weight:600;color:var(--chipink);background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:8px 13px;white-space:nowrap}
@@ -183,12 +188,14 @@
         <button type="button" class="minibtn ghost" id="resetRoutes">Reset to Starair</button>
       </div>
     </div>
-    <div class="row2">
-      <div class="field"><label>DEP</label><input id="dep" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ICAO or IATA"></div>
-      <div class="field"><label>ARR</label><input id="arr" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ICAO or IATA"></div>
-    </div>
-    <div class="field"><label>ALT / ENROUTE</label><input id="alt" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ICAO or IATA"></div>
-    <p class="hint">Separate codes with space, comma <code>,</code> or dot <code>.</code> — IATA or ICAO.</p>
+    <!-- One field, because on a phone three are three chances to tab into the
+         wrong one. The order carries the role (first DEP, second ARR, rest
+         ENROUTE) and the reading underneath makes that rule visible instead of
+         hidden — the pilot sees what the app understood before pressing Get. -->
+    <div class="field"><label>Aerodromes <span>· in flight order</span></label>
+      <input id="ads" autocapitalize="characters" autocomplete="off" spellcheck="false"
+             placeholder="DEP ARR ENROUTE  eg CPH BER LGAV EDDK"></div>
+    <p class="hint" id="adread">First is <b>departure</b>, second is <b>arrival</b>, the rest are <b>enroute</b> — IATA or ICAO, separated by space, comma <code>,</code> or dot <code>.</code></p>
     <div class="field"><label>Day</label>
       <div class="daytoggle" id="daytoggle">
         <button type="button" class="dayb active" data-day="today">Today</button>
@@ -219,7 +226,7 @@
     <div class="fbcard">
       <div class="fbhead">How it works<button class="fbx" id="helpClose" aria-label="Close">✕</button></div>
       <ol class="steps">
-        <li><b>Enter the aerodromes</b>Required: <code>DEP</code> and <code>ARR</code>. Add alternates and enroute fields under <code>ALT / ENROUTE</code>. ICAO or IATA, separated by space or comma.</li>
+        <li><b>Type the aerodromes in flight order</b>One field: the first is your <b>departure</b>, the second your <b>arrival</b>, and everything after is <b>enroute</b> — alternates, tech stops, whatever you want briefed. IATA or ICAO, mixed freely: <code>CPH BER LGAV EDDK</code>. The line under the field always shows what the app understood.</li>
         <li><b>Select day, ETD and flight time</b>Pick <code>Today</code> or <code>Tomorrow</code>, then <code>ETD</code> (UTC) and <code>EET</code>. The briefing only keeps what is active in that window — wrong times, wrong NOTAMs.</li>
         <li><b>Save or edit your routes</b>Tap a route chip to fill the form instantly. Press <code>Edit</code> to save the current route, rename or delete — your routes stay on this device.</li>
       </ol>
@@ -241,7 +248,6 @@
 
 <script>
   // Send raw codes (IATA or ICAO); the server resolves IATA->ICAO via the full table.
-  function codes(raw){return raw.split(/[\s,.]+/).map(function(s){return s.trim().toUpperCase();}).filter(Boolean).join(' ');}
   function esc(s){return (s||'').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
 
   // Collapsed group with each NOTAM's full original text (no AI).
@@ -382,6 +388,39 @@
     return id;
   }
 
+  // ── Aerodromes: one field, order carries the role ─────────────────────────
+  // first = DEP, second = ARR, everything after = ENROUTE. The rule is only
+  // acceptable because it is never hidden: adRead() writes back what the app
+  // understood, live, under the field. Duplicates are dropped as you type-check
+  // (a code repeated from a saved route shouldn't be briefed twice).
+  var adsEl = document.getElementById('ads'), adReadEl = document.getElementById('adread');
+  var AD_HINT = adReadEl.innerHTML;                       // the untouched instructions
+
+  function adList(){                                      // -> ['CPH','BER',...]
+    var seen = {}, out = [];
+    adsEl.value.split(/[\s,.]+/).forEach(function(s){
+      var c = s.trim().toUpperCase();
+      if(c && !seen[c]){ seen[c] = 1; out.push(c); }
+    });
+    return out;
+  }
+
+  function adRoles(){                                     // -> {dep, arr, enr[]}
+    var a = adList();
+    return {dep: a[0] || '', arr: a[1] || '', enr: a.slice(2)};
+  }
+
+  function adRead(){
+    var r = adRoles(), parts = [];
+    if(!r.dep){ adReadEl.className = 'hint'; adReadEl.innerHTML = AD_HINT; return; }
+    parts.push('<i>DEP</i> ' + esc(r.dep));
+    parts.push(r.arr ? '<i>ARR</i> ' + esc(r.arr) : '<s>ARR missing</s>');
+    if(r.enr.length) parts.push('<i>ENR</i> ' + esc(r.enr.join(', ')));
+    adReadEl.className = 'hint read';
+    adReadEl.innerHTML = parts.join(' &nbsp;·&nbsp; ');
+  }
+  adsEl.addEventListener('input', adRead);
+
   // ── Saved routes ──────────────────────────────────────────────────────────
   // The Starair defaults (the seed). Each pilot's own edits are kept in the
   // browser (localStorage) and layered on top — no login, no server, private to
@@ -417,15 +456,15 @@
   function lastCode(s){ var t = (s||'').trim().split(/\s+/); return t[t.length-1] || ''; }
   function sortRoutes(){ ROUTES.sort(function(a,b){ return lastCode(a.arr).localeCompare(lastCode(b.arr)); }); }
 
+  // Saved routes keep the old dep/arr/alt/enr shape — a stored route is data a
+  // pilot may have edited by hand, so we read it as-is and only flatten it into
+  // the single field on the way in. Order is preserved, adList() drops repeats.
+  // Note: routes whose `arr` holds two codes (a tech stop, e.g. "BGY AOI") keep
+  // both airports; only the second one now reads as ENR rather than ARR.
   function applyRoute(r){
-    document.getElementById('dep').value = r.dep;
-    document.getElementById('arr').value = r.arr;
-    // ALT + ENROUTE share one field now. Drop codes already flown as dep/arr,
-    // so no airport is fetched twice.
-    var seen = (r.dep + ' ' + r.arr).toUpperCase().split(/\s+/);
-    var extra = ((r.alt || '') + ' ' + (r.enr || '')).split(/\s+/)
-      .filter(function(c){ return c && seen.indexOf(c.toUpperCase()) < 0; });
-    document.getElementById('alt').value = extra.join(' ');
+    adsEl.value = [r.dep, r.arr, r.alt || '', r.enr || '']
+      .join(' ').split(/\s+/).filter(Boolean).join(' ');
+    adRead();
   }
 
   var routesEl = document.getElementById('routes');
@@ -457,16 +496,14 @@
     renderRoutes();
   });
 
-  // Save the current DEP/ARR/ALT-ENROUTE as a route (overwrites one with the same name).
+  // Save what's in the aerodrome field as a route (overwrites one with the same name).
   document.getElementById('addRoute').addEventListener('click', function(){
-    var dep = document.getElementById('dep').value.trim();
-    var arrv = document.getElementById('arr').value.trim();
-    var altenr = document.getElementById('alt').value.trim();
-    if(!dep || !arrv){ alert('Fill in DEP and ARR first, then save.'); return; }
-    var label = prompt('Route name (chip label):', activeLabel || (lastCode(dep) + '–' + lastCode(arrv)));
+    var r = adRoles();
+    if(!r.dep || !r.arr){ alert('Enter at least a departure and an arrival first, then save.'); return; }
+    var label = prompt('Route name (chip label):', activeLabel || (r.dep + '–' + r.arr));
     if(label === null) return;
     label = label.trim(); if(!label) return;
-    var route = {label: label, dep: dep, arr: arrv, enr: altenr};
+    var route = {label: label, dep: r.dep, arr: r.arr, enr: r.enr.join(' ')};
     var idx = -1;
     for(var i = 0; i < ROUTES.length; i++){ if(ROUTES[i].label.toLowerCase() === label.toLowerCase()){ idx = i; break; } }
     if(idx >= 0) ROUTES[idx] = route; else ROUTES.push(route);
@@ -507,10 +544,18 @@
   btn.addEventListener('click', function(){
     var etd = document.getElementById('etd').value;
     var eet = document.getElementById('eet').value;
+    var ad = adRoles();
+    // Say what's missing instead of briefing an empty route: the request would
+    // otherwise go through and come back with nothing, teaching the pilot nothing.
+    if(!ad.dep || !ad.arr){
+      adsEl.focus();
+      showBanner('✏️ Enter at least two aerodromes — the first is your departure, the second your arrival.', 'warn');
+      return;
+    }
     var body = {
-      dep: codes(document.getElementById('dep').value),
-      arr: codes(document.getElementById('arr').value),
-      alt: codes(document.getElementById('alt').value),
+      dep: ad.dep,
+      arr: ad.arr,
+      enr: ad.enr.join(' '),
       etd: etd.replace(':',''),
       eet: eet.trim(),
       day: selectedDay
@@ -549,9 +594,8 @@
   }
   function currentRouteName(){                // label if a route chip was tapped, else DEP–ARR
     if(activeLabel) return activeLabel;
-    var dep = lastCode(document.getElementById('dep').value);
-    var arr = lastCode(document.getElementById('arr').value);
-    return (dep||'?') + '–' + (arr||'?');
+    var r = adRoles();
+    return (r.dep||'?') + '–' + (r.arr||'?');
   }
 
   var DLDB='notamwx', DLSTORE='briefings';
@@ -634,7 +678,8 @@
       var el = d.querySelector('.id'); if(el) open.push(el.textContent);
     });
     return {
-      form: {dep:fbVal('dep'), arr:fbVal('arr'), alt:fbVal('alt'), day:selectedDay, etd:fbVal('etd'), eet:fbVal('eet')},
+      form: {ads:fbVal('ads'), dep:adRoles().dep, arr:adRoles().arr,
+             day:selectedDay, etd:fbVal('etd'), eet:fbVal('eet')},
       openNotams: open,
       briefing: window.__lastBriefing || null,
       query: window.__lastQuery || null,

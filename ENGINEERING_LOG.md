@@ -531,3 +531,42 @@ gemte værdi i stedet for 0. Pinnet i `test_stats.py` som en sekvens: ok → ok 
 lyve. Enten skal man detektere nulstillingen (som tokens), eller vælge en idempotent operation
 (union, som piloterne) — og så er "endepunktet svarede ikke" et *tredje* tilfælde, der ligner en
 nulstilling, men ikke er det.
+
+## 2026-07-22 (3) — Ét aerodrome-felt: rækkefølgen bærer rollen (+ frontend får endelig tests)
+
+Tre felter (DEP / ARR / ALT-ENROUTE) er på en telefon tre chancer for at ramme det forkerte. Nu ét
+felt, hvor **positionen** bærer rollen: første kode = DEP, anden = ARR, resten = ENR. Placeholder:
+`DEP ARR ENROUTE  eg CPH BER LGAV EDDK`.
+
+**Undersøgt før beslutningen:** rollen styrer *intet* i motoren i dag — den er et badge i outputtet
+(`briefing.py:111`, `index.html:333`), og alle pladser deler ét vindue `[ETD, ETD+EET]`. Så ét felt
+koster ingen funktionalitet nu. Rollen bevares alligevel i inputtet, fordi den ikke kan udledes
+bagefter (`CGN CPH EKVG LIME` afslører ikke destinationen) — og per-plads tidsvinduer (NOTAM ved
+afgang omkring ETD, ved ankomst omkring ETA) er det oplagte næste skridt.
+
+**En skjult konvention er kun acceptabel hvis den ikke er skjult:** under feltet skrives løbende hvad
+appen forstod — `DEP CPH · ARR BER · ENR LGAV, EDDK` — så reglen er synlig og selvrettende mens man
+taster. Mangler ARR, står der `ARR missing`. Tomt felt giver instruktionerne tilbage.
+
+**Kendt konsekvens:** de gemte Starair-ruter har flere koder i `arr` (tekniske stop, fx `CGN–AOI`
+med `arr:"BGY AOI"`). Fladet ud bliver BGY til ARR og AOI til ENR. Begge pladser briefes nøjagtigt
+som før — kun mærkatet flytter sig. Ruternes lagerformat (dep/arr/alt/enr) er urørt; de flades kun
+ud på vej ind i feltet, så en pilots egne gemte ruter læses stadig som de er.
+
+**Samtidig:** "Get briefing" validerede ikke input. Et tomt skema sendte et kald afsted, fik en tom
+briefing tilbage, og piloten fik aldrig at vide hvad der manglede. Nu siges det før kaldet.
+`codes()` blev død kode og er fjernet.
+
+**Frontenden har nu tests (`test_web.py`) — den havde ingen, og det var dér ETD-fejlen levede.**
+Ingen node, ingen npm, intet downloadet: macOS har **JavaScriptCore** (`jsc`) indbygget. Testen
+trækker det *rigtige* `<script>` ud af `index.html` og kører det mod en DOM-stub — ingen
+genimplementering, så en omdøbning i index.html får testen til at fejle. Uden `jsc` skipper den.
+
+**Testen var først pynt:** en mutationstest (bryd koden med vilje, se om testen opdager det) viste,
+at fjernede man `addEventListener('input', adRead)`, bestod alt stadig — fordi testen kaldte
+`adRead()` direkte i stedet for at *taste*. Rettet til at gå gennem input-hændelsen; nu fanges alle
+seks mutationer (byt DEP/ARR, drop dubletfiltrering, fjern tom-skema-værnet, fjern live-linjen,
+fjern ARR-advarslen, ødelæg rute-udfyldningen).
+
+**Læring:** en test der ikke kan fejle, tester ikke noget. Mutationstesten tog to minutter og fandt
+et hul i testen på første forsøg.
