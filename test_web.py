@@ -102,27 +102,36 @@ document.getElementById("go").fire("click");
 ok("one aerodrome blocks the request and focuses the field",
    LOG.indexOf("focus:ads")>=0, true);
 
-// --- airlines: every operator keeps its own list ----------------------------
-var airlineEl=document.getElementById("airline"), routeEl=document.getElementById("routeSel");
-function names(el){                       // the visible labels of a pick-list
-  var out=[], re=/<option[^>]*>([^<]*)</g, m;
-  while((m=re.exec(el.innerHTML))) out.push(m[1]);
+// --- airlines: one menu each, every operator keeps its own list -------------
+var airlinesEl=document.getElementById("airlines");
+
+function menus(){                         // -> [[airline label, route, route...], ...]
+  var out=[], sel=/<select[^>]*>([\s\S]*?)<\/select>/g, m;
+  while((m=sel.exec(airlinesEl.innerHTML))){
+    var opts=[], o=/<option[^>]*>([^<]*)</g, x;
+    while((x=o.exec(m[1]))) opts.push(x[1]);
+    out.push(opts);
+  }
   return out;
 }
+function pick(airlineIndex, routeLabel){  // choosing from one airline's menu
+  airlinesEl.fire("change", {target:{dataset:{air:String(airlineIndex)}, value:routeLabel}});
+}
 
-ok("seeded with Star Air only", names(airlineEl), ["Star Air"]);
-ok("its routes are listed", names(routeEl).indexOf("CGN–BER")>0, true);
+ok("one menu, labelled Star Air", menus().length, 1);
+ok("the menu is the airline name plus its routes",
+   [menus()[0][0], menus()[0].indexOf("CGN–BER")>0], ["Star Air", true]);
 
-// Picking a route fills the aerodrome field.
-routeEl.value="CGN–BER"; routeEl.fire("change");
+pick(0, "CGN–BER");
 ok("choosing a route fills the form", ads.value.indexOf("CGN BER")===0, true);
 
 // A pilot at another operator adds their own airline; it starts empty.
 PROMPT="SAS"; document.getElementById("addAirline").fire("click");
-ok("new airline appears and is selected", [names(airlineEl), FLEETS.active],
-   [["SAS","Star Air"], "SAS"]);
+ok("a second menu appears, Star Air still first",
+   [menus().length, menus()[0][0], menus()[1][0]],
+   [2, "Star Air", "SAS (no routes yet)"]);
+ok("...and the edit buttons follow it", FLEETS.active, "SAS");
 ok("...with no routes of its own", routes().length, 0);
-ok("...and the route menu says so", names(routeEl), ["— no routes yet —"]);
 
 // Saving a route puts it under the selected airline, not Star Air.
 ads.value="CPH ARN OSL"; PROMPT="CPH-ARN";
@@ -139,11 +148,14 @@ ok("everything persists to localStorage", (function(){
      return [f.active, sas?sas.routes.length:-1, sas?sas.routes[0].label:""];
    })(), ["SAS", 1, "CPH-ARN"]);
 
-// Switching airline switches the menu.
-airlineEl.value="Star Air"; airlineEl.fire("change");
-ok("switching airline swaps the route list", names(routeEl).length, 13);
+// Each menu lists only its own airline's routes.
+ok("menus stay separate", [menus()[0].length, menus()[1].length], [13, 2]);
 
-// Saving goes to the airline on screen, even when it is not the first one.
+// Using a menu switches which airline the edit buttons act on.
+pick(0, "CGN–BER");
+ok("picking from Star Air switches the edit target", FLEETS.active, "Star Air");
+
+// Saving goes to the airline whose menu was last used, not simply the first.
 ads.value="EKCH EKVG"; PROMPT="CPH-FAE";
 document.getElementById("addRoute").fire("click");
 ok("a route lands in the selected airline, not the first",
@@ -161,13 +173,24 @@ LOG.length=0; document.getElementById("delRoute").fire("click");
 ok("with no route selected, delete asks instead of guessing",
    LOG.length===1 && LOG[0].indexOf("alert:")===0, true);
 
-// Deleting an airline takes its routes with it, and never leaves you with none.
-airlineEl.value="SAS"; airlineEl.fire("change");
-CONFIRM=true; document.getElementById("delAirline").fire("click");
-ok("airline deleted", names(airlineEl), ["Star Air"]);
-ok("...and the deletion is stored", loadFleets().airlines.length, 1);
+// Deleting from an airline that is NOT first in the list: with Star Air first,
+// a handler that reached for airlines[0] would look correct until now.
+pick(1, "CPH-ARN");
+CONFIRM=true; document.getElementById("delRoute").fire("click");
+ok("deleting from a later airline leaves Star Air alone",
+   [FLEETS.airlines[1].routes.length, FLEETS.airlines[0].routes.length], [0, 12]);
+
+// Star Air is built in, so it is never deletable — even with its menu selected.
+pick(0, "");
+LOG.length=0; CONFIRM=true; document.getElementById("delAirline").fire("click");
+ok("Star Air cannot be deleted",
+   [menus().length, LOG.length===1 && LOG[0].indexOf("built into the app")>0], [2, true]);
+
+// A pilot's own airline can go, and takes its routes with it.
+pick(1, "");
 document.getElementById("delAirline").fire("click");
-ok("the last airline cannot be deleted", names(airlineEl), ["Star Air"]);
+ok("an added airline is deleted", [menus().length, menus()[0][0]], [1, "Star Air"]);
+ok("...and the deletion is stored", loadFleets().airlines.length, 1);
 
 // A pilot who edited the old flat list keeps those edits after the upgrade.
 ok("v1 routes migrate into Star Air",

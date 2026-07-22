@@ -65,6 +65,13 @@
   .rwrap{display:inline-flex;flex:0 0 auto;align-items:center}
   .rdel{flex:0 0 auto;cursor:pointer;width:24px;height:24px;margin-left:3px;padding:0;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--crit);font-size:15px;font-weight:700;line-height:1}
   .routeedit{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+  /* One dropdown per airline. They wrap rather than shrink, so a fifth airline
+     starts a new line instead of squeezing the names into ellipses. */
+  .airlines{display:flex;gap:8px;flex-wrap:wrap}
+  .airlines select{flex:1 1 150px;width:auto;min-width:0}
+  .airlines select.picked{border-color:var(--accent);color:var(--ink)}
+  .editfor{flex:1 0 100%;margin:0 2px 2px;font-size:11.5px;color:var(--faint)}
+  .editfor b{color:var(--accent);font-weight:700}
   .minibtn{cursor:pointer;font-family:var(--ui);font-size:13px;font-weight:600;color:#fff;background:var(--accent);border:0;border-radius:9px;padding:8px 12px}
   .minibtn.ghost{background:var(--chip);color:var(--chipink);border:1px solid var(--line)}
   .daytoggle{display:flex;border:1px solid var(--line);border-radius:11px;overflow:hidden}
@@ -185,17 +192,18 @@
          row of chips: a full route network is dozens of legs, and chips only fit
          a handful before they scroll off a phone. -->
     <div class="field" style="margin-bottom:9px">
-      <div class="rowlabel"><label>Saved routes <span>· pick to fill the form</span></label><button type="button" class="linkbtn" id="editRoutes">Edit</button></div>
-      <div class="row2" style="margin-bottom:0">
-        <div class="field" style="margin-bottom:0"><select class="plain" id="airline" aria-label="Airline"></select></div>
-        <div class="field" style="margin-bottom:0"><select class="plain" id="routeSel" aria-label="Route"></select></div>
-      </div>
+      <div class="rowlabel"><label>Saved routes <span>· pick one to fill the form</span></label><button type="button" class="linkbtn" id="editRoutes">Edit</button></div>
+      <!-- One menu per airline, side by side: Star Air is the app's built-in
+           list and always sits first, and each airline a pilot adds gets its own
+           menu beside it. A route is then one tap away instead of two. -->
+      <div class="airlines" id="airlines"></div>
       <div class="routeedit" id="routeEdit" hidden>
+        <p class="editfor" id="editFor"></p>
         <button type="button" class="minibtn" id="addRoute">＋ Save current as route</button>
         <button type="button" class="minibtn ghost" id="delRoute">Delete route</button>
         <button type="button" class="minibtn ghost" id="addAirline">＋ New airline</button>
         <button type="button" class="minibtn ghost" id="delAirline">Delete airline</button>
-        <button type="button" class="minibtn ghost" id="resetRoutes">Reset to Star Air</button>
+        <button type="button" class="minibtn ghost" id="resetRoutes">Reset Star Air</button>
       </div>
     </div>
     <!-- One field, because on a phone three are three chances to tab into the
@@ -504,8 +512,8 @@
     adRead();
   }
 
-  var airlineEl = document.getElementById('airline');
-  var routeEl = document.getElementById('routeSel');
+  var airlinesEl = document.getElementById('airlines');
+  var editForEl = document.getElementById('editFor');
   var editBtn = document.getElementById('editRoutes');
   var routeEdit = document.getElementById('routeEdit');
 
@@ -513,35 +521,46 @@
     return '<option value="'+esc(value)+'"'+(sel?' selected':'')+'>'+esc(text)+'</option>';
   }
 
+  // Each airline is its own menu, and its own name is the menu's resting label —
+  // so the row reads as "Star Air ▾  SAS ▾" until a route is chosen from one.
   function renderRoutes(){
-    airlineEl.innerHTML = FLEETS.airlines.map(function(a){
-      return opt(a.name, a.name, a.name === FLEETS.active);
+    airlinesEl.innerHTML = FLEETS.airlines.map(function(a, i){
+      var mine = a.name === FLEETS.active && activeLabel;
+      return '<select class="plain' + (mine ? ' picked' : '') + '" data-air="' + i +
+             '" aria-label="' + esc(a.name) + ' routes">' +
+             opt('', a.routes.length ? a.name : a.name + ' (no routes yet)', !mine) +
+             a.routes.map(function(r){
+               return opt(r.label, r.label, mine && r.label === activeLabel);
+             }).join('') + '</select>';
     }).join('');
-    var rs = routes();
-    routeEl.innerHTML = opt('', rs.length ? '— select route —' : '— no routes yet —',
-                            !activeLabel) +
-      rs.map(function(r){ return opt(r.label, r.label, r.label === activeLabel); }).join('');
-    routeEl.disabled = !rs.length;
+    editForEl.innerHTML = 'Editing <b>' + esc(airline().name) + '</b>' +
+      (FLEETS.airlines.length > 1 ? ' — pick from another menu to switch' : '');
   }
 
-  airlineEl.addEventListener('change', function(){
-    FLEETS.active = airlineEl.value;
-    activeLabel = null;                    // a route from another airline no longer applies
-    saveFleets(); renderRoutes();
-  });
-
-  routeEl.addEventListener('change', function(){
-    var label = routeEl.value;
-    if(!label){ activeLabel = null; return; }
-    var rs = routes();
-    for(var i = 0; i < rs.length; i++)
-      if(rs[i].label === label){ applyRoute(rs[i]); activeLabel = label; return; }
+  // One handler for every menu: which airline it belongs to is on the element.
+  airlinesEl.addEventListener('change', function(e){
+    var sel = e.target;
+    if(!sel || sel.dataset === undefined || sel.dataset.air === undefined) return;
+    var a = FLEETS.airlines[+sel.dataset.air];
+    if(!a) return;
+    FLEETS.active = a.name;                 // edit buttons follow the menu you used
+    if(!sel.value){ activeLabel = null; saveFleets(); renderRoutes(); return; }
+    for(var i = 0; i < a.routes.length; i++){
+      if(a.routes[i].label === sel.value){
+        applyRoute(a.routes[i]);
+        activeLabel = sel.value;
+        saveFleets();
+        renderRoutes();                     // resets the other menus to their names
+        return;
+      }
+    }
   });
 
   editBtn.addEventListener('click', function(){
     editMode = !editMode;
     editBtn.textContent = editMode ? 'Done' : 'Edit';
     routeEdit.hidden = !editMode;
+    if(editMode) renderRoutes();            // refresh "Editing <airline>"
   });
 
   // Save what's in the aerodrome field as a route of the selected airline
@@ -582,13 +601,25 @@
       }
     }
     FLEETS.airlines.push({name: name, routes: []});
-    FLEETS.airlines.sort(function(a, b){ return a.name.localeCompare(b.name); });
+    // Star Air is the app's built-in list and keeps the first menu; the pilot's
+    // own airlines sort alphabetically after it.
+    FLEETS.airlines.sort(function(a, b){
+      if(a.name === SEED_AIRLINE) return -1;
+      if(b.name === SEED_AIRLINE) return 1;
+      return a.name.localeCompare(b.name);
+    });
     FLEETS.active = name; activeLabel = null; saveFleets(); renderRoutes();
   });
 
   document.getElementById('delAirline').addEventListener('click', function(){
-    if(FLEETS.airlines.length < 2){ alert('This is your only airline — it cannot be deleted.'); return; }
     var a = airline();
+    // Star Air is built into the app, not something a pilot added, so it stays.
+    // Emptying its routes is "Reset Star Air"; removing the airline is not offered.
+    if(a.name === SEED_AIRLINE){
+      alert(SEED_AIRLINE + ' is built into the app and cannot be deleted. Pick one of your own airlines, or use “Reset ' + SEED_AIRLINE + '”.');
+      return;
+    }
+    if(FLEETS.airlines.length < 2){ alert('This is your only airline — it cannot be deleted.'); return; }
     if(!confirm('Delete ' + a.name + ' and its ' + a.routes.length + ' route(s)?')) return;
     FLEETS.airlines = FLEETS.airlines.filter(function(x){ return x !== a; });
     FLEETS.active = FLEETS.airlines[0].name;

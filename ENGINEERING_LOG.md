@@ -603,3 +603,27 @@ Efter rettelserne fanges alle otte mutationer. 30 frontend-assertions i alt.
 **Læring:** mutationstest afslører ikke fejl i koden — den afslører fejl i *testene*. To af de tre
 huller her var tests, der så ud til at dække noget, men målte et objekt, der ved et tilfælde var det
 rigtige. Det havde ingen kodegennemgang fanget.
+
+## 2026-07-22 (5) — Én dropdown per flyselskab; Star Air er appens indbyggede
+
+Rettelse af (4): i stedet for *vælg selskab → vælg rute* (to tryk) har **hvert selskab nu sin egen
+dropdown** side om side. Menuens hviletilstand er selskabets navn, så rækken læses som
+`Star Air ▾   SAS ▾`, og en rute er ét tryk væk. Menuerne ombryder til ny linje frem for at klemme
+navnene sammen, så en femte kolonne ikke ødelægger telefonlayoutet.
+
+**Star Air er legacy/indbygget:** den har altid første menu (sorteringen tvinger den forrest), og
+den kan **ikke slettes** — "Delete airline" afviser den og henviser til "Reset Star Air", som kun
+tømmer dens egne ruter. Pilotens egne selskaber sorteres alfabetisk bagefter og kan slettes frit.
+
+**Aktivt selskab** er nu simpelthen den menu, man sidst brugte; edit-rækken skriver
+`Editing <selskab>`, så "Save current as route" aldrig gætter forkert.
+
+**Mutationstesten fangede den samme fælde som sidst — igen.** Testen for sletning af en rute kørte
+med Star Air aktiv, og Star Air er `airlines[0]`, så `routes()` og `airlines[0].routes` var samme
+objekt: en handler der greb fat i det forkerte array ville bestå. Rettet ved at slette fra et
+*ikke-første* selskab. Præcis samme fejl som i (4), i en ny forklædning — værd at huske: **når
+seed'et altid ligger først, er "første" og "aktive" som standard det samme, og enhver test der ikke
+med vilje adskiller dem, måler ingenting.** Alle 11 mutationer fanges nu; 32 frontend-assertions.
+
+**Sprog:** alt brugeren ser er engelsk (knapper, labels, advarsler) — kun denne logbog og samtalen
+med piloten er dansk.
