@@ -130,9 +130,10 @@ def stats_page():
                 row("Tokens", f'{life.get("total", 0):,}'.replace(",", " "),
                     _cost_dkk(life)))
         stamp = f'Lifetime · last updated {life.get("updated_at", "—")}'
+        if _LIFETIME_CACHE.get("stale"):
+            stamp += ' · could not refresh just now, showing the last read'
     else:
-        head = row("Lifetime", "not available",
-                   "set GIST_ID on the server to read the stored totals")
+        head = row("Lifetime", "not available", _LIFETIME_CACHE.get("why", ""))
         stamp = "Lifetime"
     body = (row("Pilots (unique devices)", now["devices"]) +
             row("Briefings built", now["briefings"]) +
@@ -164,27 +165,36 @@ def _cost_dkk(life: dict) -> str:
     return f"≈ ${usd:.2f}"
 
 
-_LIFETIME_CACHE: dict = {"at": 0.0, "data": None}
+_LIFETIME_CACHE: dict = {"at": 0.0, "data": None, "why": "", "stale": False}
 
 
 def _lifetime() -> dict | None:
     """Lifetime totals from the secret Gist the keep-alive job writes.
 
-    Read-only and unauthenticated: a secret Gist is readable by anyone holding
-    its ID, so the server needs GIST_ID but not the token that writes it. Cached
-    for 5 minutes — GitHub allows 60 unauthenticated calls an hour, and this page
-    is refreshed by hand. Any failure returns None and the page says so.
+    A secret Gist is readable by anyone holding its ID, so GIST_ID alone is
+    enough. Unauthenticated GitHub allows only 60 calls an hour PER IP, and
+    Render's outbound IP is shared with other tenants — so that quota can be
+    spent by strangers. If GIST_TOKEN is also set we send it and get 5000/hour
+    instead; it is optional, and only ever used to read.
+
+    On failure the last good answer is served (marked stale) rather than
+    nothing: an hour-old lifetime total is far more useful than a blank page.
     """
     gid = os.environ.get("GIST_ID", "")
     if not gid:
+        _LIFETIME_CACHE["why"] = "set GIST_ID on the server to read the stored totals"
         return None
     if _LIFETIME_CACHE["data"] and time.time() - _LIFETIME_CACHE["at"] < 300:
         return _LIFETIME_CACHE["data"]
+
+    headers = {"User-Agent": "notam-ai-stats",
+               "Accept": "application/vnd.github+json"}
+    token = os.environ.get("GIST_TOKEN", "")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     try:
-        req = urllib.request.Request(
-            f"https://api.github.com/gists/{gid}",
-            headers={"User-Agent": "notam-ai-stats",
-                     "Accept": "application/vnd.github+json"})
+        req = urllib.request.Request(f"https://api.github.com/gists/{gid}",
+                                     headers=headers)
         with urllib.request.urlopen(req, timeout=10) as r:
             gist = json.load(r)
         state = json.loads(gist["files"]["notam-ai-usage.json"]["content"])
@@ -192,10 +202,19 @@ def _lifetime() -> dict | None:
         out["users"] = len(state.get("users") or [])
         out["briefings"] = (state.get("lifetime") or {}).get("briefings", "—")
         out["updated_at"] = state.get("updated_at", "—")
-    except Exception:
-        app.logger.exception("could not read lifetime stats from Gist %s", gid)
+    except Exception as e:
+        why = f"could not read the Gist ({e})"
+        if isinstance(e, urllib.error.HTTPError) and e.code in (403, 429):
+            why = ("GitHub rate limit reached — the server shares an outbound IP, "
+                   "so the free 60/hour can be spent by others. Set GIST_TOKEN "
+                   "on the server for 5000/hour, or just try again later.")
+        app.logger.warning("lifetime stats unavailable: %s", why)
+        _LIFETIME_CACHE["why"] = why
+        if _LIFETIME_CACHE["data"]:               # serve the last good read
+            _LIFETIME_CACHE["stale"] = True
+            return _LIFETIME_CACHE["data"]
         return None
-    _LIFETIME_CACHE.update(at=time.time(), data=out)
+    _LIFETIME_CACHE.update(at=time.time(), data=out, why="", stale=False)
     return out
 
 

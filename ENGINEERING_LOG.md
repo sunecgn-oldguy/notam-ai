@@ -704,3 +704,28 @@ førstegangsbrugere" og "undlad at markere den læst").
 
 `sw.js` bumpet til v3: en gammel cache ville vise udgivelsesnoten én opstart senere end den påstår.
 42 frontend-assertions, seks nye mutationer fanget.
+
+## 2026-07-22 (9) — /stats løj om årsagen; lifetime-læsningen gjort robust
+
+**Symptom:** `/stats` viste lifetime-tallene kl. 23:00, men kl. 23:45 stod der "not available — set
+GIST_ID on the server". `GIST_ID` **var** sat og havde lige virket.
+
+**To fejl, hvoraf den ene skjulte den anden:**
+1. `_lifetime()` returnerede `None` både når `GIST_ID` manglede og når hentningen fejlede, så siden
+   viste altid samme (forkerte) forklaring. En fejlbesked der gætter, sender fejlsøgningen det
+   forkerte sted hen — jeg brugte selv tid på at tjekke en variabel, der var i orden.
+2. Den egentlige årsag: GitHub tillader kun **60 ikke-autentificerede kald i timen pr. IP**, og
+   Renders udgående IP deles med andre kunder — kvoten kan altså være brugt op af vildt fremmede.
+   Mine egne gentagne poll af `/stats` (hver 30-90 sek. i ~25 min) har sandsynligvis også bidraget.
+
+**Rettet:**
+- Siden siger nu **hvorfor**: rate limit, netværksfejl, eller reelt manglende `GIST_ID`.
+- Ved fejl serveres **sidste vellykkede læsning**, mærket "could not refresh just now, showing the
+  last read". Et timegammelt lifetime-tal er langt mere brugbart end en blank side.
+- Valgfri `GIST_TOKEN` på serveren giver 5000 kald/time i stedet for 60. Bruges kun til læsning.
+
+Alle fire tilstande (læsbar / rate-limited med cache / rate-limited uden cache / GIST_ID mangler) er
+pinnet i `test_stats.py`.
+
+**Læring:** en fejlbesked skal rapportere det, koden faktisk observerede — ikke den mest sandsynlige
+årsag. `return None` for tre forskellige situationer sparede tre linjer og kostede en fejlsøgning.
