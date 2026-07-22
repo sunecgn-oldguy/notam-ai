@@ -466,12 +466,24 @@
   var RKEY = 'notamwx.routes.v1';        // v1: one flat list, Star Air only
   var FKEY = 'notamwx.airlines.v2';      // v2: routes grouped by airline
 
+  // Star Air is the app's own list and always holds the leftmost menu; the
+  // pilot's own airlines sort alphabetically after it. Applied on load as well
+  // as on insert, so an order stored by an earlier version gets corrected
+  // instead of being wrong on that device forever.
+  function orderAirlines(list){
+    return list.sort(function(a, b){
+      if(a.name === SEED_AIRLINE) return -1;
+      if(b.name === SEED_AIRLINE) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }
+
   function loadFleets(){
     try{
       var raw = localStorage.getItem(FKEY);
       if(raw){
         var f = JSON.parse(raw);
-        if(f && f.airlines && f.airlines.length) return f;
+        if(f && f.airlines && f.airlines.length){ orderAirlines(f.airlines); return f; }
       }
       // First run after the upgrade: a pilot may have spent time editing the old
       // flat list, so carry it over as their Star Air rather than discarding it.
@@ -522,7 +534,7 @@
   }
 
   // Each airline is its own menu, and its own name is the menu's resting label —
-  // so the row reads as "Star Air ▾  SAS ▾" until a route is chosen from one.
+  // so the row reads as "Star Air ▾  <your airline> ▾" until a route is chosen.
   function renderRoutes(){
     airlinesEl.innerHTML = FLEETS.airlines.map(function(a, i){
       var mine = a.name === FLEETS.active && activeLabel;
@@ -591,7 +603,7 @@
   });
 
   document.getElementById('addAirline').addEventListener('click', function(){
-    var name = prompt('Airline name (e.g. SAS). Its routes start empty — build them with “Save current as route”.', '');
+    var name = prompt('Name your airline — whatever you want on the menu. It starts with no routes; add them with “Save current as route”.', '');
     if(name === null) return;
     name = name.trim(); if(!name) return;
     for(var i = 0; i < FLEETS.airlines.length; i++){
@@ -601,13 +613,7 @@
       }
     }
     FLEETS.airlines.push({name: name, routes: []});
-    // Star Air is the app's built-in list and keeps the first menu; the pilot's
-    // own airlines sort alphabetically after it.
-    FLEETS.airlines.sort(function(a, b){
-      if(a.name === SEED_AIRLINE) return -1;
-      if(b.name === SEED_AIRLINE) return 1;
-      return a.name.localeCompare(b.name);
-    });
+    orderAirlines(FLEETS.airlines);
     FLEETS.active = name; activeLabel = null; saveFleets(); renderRoutes();
   });
 

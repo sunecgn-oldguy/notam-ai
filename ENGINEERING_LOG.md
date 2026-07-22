@@ -627,3 +627,29 @@ med vilje adskiller dem, måler ingenting.** Alle 11 mutationer fanges nu; 32 fr
 
 **Sprog:** alt brugeren ser er engelsk (knapper, labels, advarsler) — kun denne logbog og samtalen
 med piloten er dansk.
+
+## 2026-07-22 (6) — Star Air permanent yderst til venstre; intet rigtigt selskabsnavn i appen
+
+To ting fra pilotens gennemsyn på telefonen.
+
+**1. Star Air lå ikke først.** Reglen "Star Air forrest" kørte kun i `addAirline` — altså kun når man
+*tilføjer*. `loadFleets()` returnerede den gemte rækkefølge råt. Havde man oprettet et selskab på den
+forrige version (som sorterede rent alfabetisk), lå fx `[Andet, Star Air]` gemt i localStorage, og
+den fejl ville **aldrig** rette sig selv på den enhed: intet sorterer en liste, der allerede er gemt.
+Sorteringen er trukket ud i `orderAirlines()` og kaldes nu **både ved indlæsning og ved indsættelse**,
+så gamle data normaliseres i stedet for at være permanent forkerte.
+
+**2. Et rigtigt selskabsnavn stod i appen.** Prompten for nyt selskab sagde "Airline name (e.g. SAS)"
+— ment som eksempel, men det læses som om appen kender selskabet. Nu: *"Name your airline — whatever
+you want on the menu."* Navnet er også fjernet fra kodekommentarer og fra testene (opdigtede navne
+bruges nu), så repoet ikke bærer en fremmed operatørs navn.
+
+**Mutationstesten fangede igen en test uden bid:** "sorter ikke ved indsættelse" bestod, fordi testen
+kun tilføjede ét selskab — og med Star Air allerede forrest giver `push` uden sortering samme
+resultat. Nu tilføjes `Zulu` og derefter `Aurora`, hvor insertion order og alfabetisk rækkefølge
+adskiller sig. Begge sorteringsveje (load + insert) er nu dækket hver for sig. 34 assertions.
+
+**Mønster tredje gang i træk:** en test, hvor to forskellige stier tilfældigvis giver samme resultat,
+måler ingenting. Først `routes()` vs `airlines[0].routes` med Star Air aktiv, så igen ved sletning,
+nu insertion order vs sortering med kun ét element. Skriv testen så de to muligheder *kan* give
+forskellige svar — ellers tester den kun, at koden ikke crasher.

@@ -126,11 +126,11 @@ pick(0, "CGN–BER");
 ok("choosing a route fills the form", ads.value.indexOf("CGN BER")===0, true);
 
 // A pilot at another operator adds their own airline; it starts empty.
-PROMPT="SAS"; document.getElementById("addAirline").fire("click");
+PROMPT="Nordic"; document.getElementById("addAirline").fire("click");
 ok("a second menu appears, Star Air still first",
    [menus().length, menus()[0][0], menus()[1][0]],
-   [2, "Star Air", "SAS (no routes yet)"]);
-ok("...and the edit buttons follow it", FLEETS.active, "SAS");
+   [2, "Star Air", "Nordic (no routes yet)"]);
+ok("...and the edit buttons follow it", FLEETS.active, "Nordic");
 ok("...with no routes of its own", routes().length, 0);
 
 // Saving a route puts it under the selected airline, not Star Air.
@@ -144,9 +144,9 @@ ok("saved route round-trips", routes()[0], {label:"CPH-ARN", dep:"CPH", arr:"ARN
 // The pilot's own routes have to survive closing the app, so check what
 // actually reached storage — not just the copy in memory.
 ok("everything persists to localStorage", (function(){
-     var f=loadFleets(), sas=f.airlines.filter(function(a){ return a.name==="SAS"; })[0];
+     var f=loadFleets(), sas=f.airlines.filter(function(a){ return a.name==="Nordic"; })[0];
      return [f.active, sas?sas.routes.length:-1, sas?sas.routes[0].label:""];
-   })(), ["SAS", 1, "CPH-ARN"]);
+   })(), ["Nordic", 1, "CPH-ARN"]);
 
 // Each menu lists only its own airline's routes.
 ok("menus stay separate", [menus()[0].length, menus()[1].length], [13, 2]);
@@ -160,14 +160,14 @@ ads.value="EKCH EKVG"; PROMPT="CPH-FAE";
 document.getElementById("addRoute").fire("click");
 ok("a route lands in the selected airline, not the first",
    [routes().length,
-    FLEETS.airlines.filter(function(a){ return a.name==="SAS"; })[0].routes.length],
+    FLEETS.airlines.filter(function(a){ return a.name==="Nordic"; })[0].routes.length],
    [13, 1]);
 
 // ...and deleting one takes it from the same place.
 CONFIRM=true; document.getElementById("delRoute").fire("click");
 ok("deleting a route only touches the airline on screen",
    [routes().length,
-    FLEETS.airlines.filter(function(a){ return a.name==="SAS"; })[0].routes.length],
+    FLEETS.airlines.filter(function(a){ return a.name==="Nordic"; })[0].routes.length],
    [12, 1]);
 LOG.length=0; document.getElementById("delRoute").fire("click");
 ok("with no route selected, delete asks instead of guessing",
@@ -192,6 +192,15 @@ document.getElementById("delAirline").fire("click");
 ok("an added airline is deleted", [menus().length, menus()[0][0]], [1, "Star Air"]);
 ok("...and the deletion is stored", loadFleets().airlines.length, 1);
 
+// An order stored by an earlier version (which sorted purely alphabetically, so
+// an airline could sit left of Star Air) must be corrected on load — otherwise
+// that device stays wrong forever, since nothing re-sorts a list already saved.
+ok("a stored order is normalised on load", (function(){
+     _ls["notamwx.airlines.v2"]=JSON.stringify({v:2, active:"Star Air", airlines:[
+       {name:"Aurora", routes:[]}, {name:"Star Air", routes:[]}, {name:"Blue", routes:[]}]});
+     return loadFleets().airlines.map(function(a){ return a.name; });
+   })(), ["Star Air", "Aurora", "Blue"]);
+
 // A pilot who edited the old flat list keeps those edits after the upgrade.
 ok("v1 routes migrate into Star Air",
    (function(){
@@ -201,6 +210,13 @@ ok("v1 routes migrate into Star Air",
      var f=loadFleets();
      return [f.airlines.length, f.airlines[0].name, f.airlines[0].routes[0].label];
    })(), [1, "Star Air", "MY-ROUTE"]);
+
+// Adding out of alphabetical order still lands the menus in a stable order —
+// insertion order alone would put Zulu before Aurora.
+PROMPT="Zulu";   document.getElementById("addAirline").fire("click");
+PROMPT="Aurora"; document.getElementById("addAirline").fire("click");
+ok("new menus sort alphabetically behind Star Air",
+   FLEETS.airlines.map(function(a){ return a.name; }), ["Star Air","Aurora","Zulu"]);
 
 print("\nALL PASSED");
 """
