@@ -729,3 +729,29 @@ pinnet i `test_stats.py`.
 
 **Læring:** en fejlbesked skal rapportere det, koden faktisk observerede — ikke den mest sandsynlige
 årsag. `return None` for tre forskellige situationer sparede tre linjer og kostede en fejlsøgning.
+
+## ÅBNE PUNKTER — hvad piloten mangler at gøre (status 2026-07-22 sen aften)
+
+Alt i koden er pushet og live. Det følgende kan **kun** gøres fra dashboards, ikke fra repoet.
+
+**1. Render → Environment: tilføj `GIST_TOKEN`** *(valgfri, men anbefalet)*
+Samme værdi som GitHub-secreten `GIST_TOKEN`. Uden den læser serveren Gist'en uden login, hvor
+GitHub kun tillader 60 kald i timen **pr. IP** — og Renders udgående IP deles med andre kunder, så
+kvoten kan være opbrugt af fremmede. Det er derfor lifetime-tallene på `/stats` af og til står som
+"not available". Med token: 5000 kald i timen. Bruges kun til læsning.
+*Allerede sat: `STATS_KEY`, `GIST_ID`, `ANTHROPIC_API_KEY`, `NOTAM_LLM`, `FEEDBACK_*`.*
+
+**2. Bekræft at brugertællingen lander i Gist'en**
+GitHub → Actions → keep-alive → nyeste kørsel → fold `usage` ud. Der skal stå
+`[usage-log] pilots N (+n), briefings N (+n)`. Står der en `skip:`-linje, er årsagen skrevet der.
+Bemærk: brug **"Run workflow"**, aldrig "Re-run jobs" — en re-run kører koden fra dét gamle commit
+(det kostede en time at opdage).
+
+**3. Overvej UptimeRobot mod `/health`** *(gratis)*
+De planlagte kørsler falder reelt kun hvert ~75. minut, ikke hvert 10., fordi GitHub nedprioriterer
+cron på gratis-planen (set i Actions: 18:41, 19:55, 21:25, 22:38). Render sover efter ~15 minutter,
+så keep-alive holder den **ikke** vågen i praksis — deraf de ~30 sekunders ventetid på første
+briefing. UptimeRobot tjekker hvert 5. minut med præcis timing.
+
+**Ikke bygget med vilje:** mailliste til nye versioner. "What's new"-boksen i appen dækker behovet
+uden persondata; mail gemmes til App Store-lanceringen, hvor man skal nå folk uden appen åben.
