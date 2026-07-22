@@ -146,7 +146,11 @@ def _view(n: dict) -> dict:
         "id": n["id"],
         "age": _age(n),
         "category": n["relevance"]["category"],
-        "summary": n.get("_summary") or summarise(n),   # precomputed in step 2
+        # Precomputed in step 2, where a failed AI call is caught and falls back
+        # to the cleaned body. NEVER call summarise() here as an "or" fallback:
+        # that call sits outside step 2's try/except, so an empty summary turned a
+        # single bad NOTAM into a 500 for the entire briefing (the KEWR bug).
+        "summary": n.get("_summary") or n.get("body", ""),
         "raw": n["raw"],                  # original NOTAM, always available
         "start": n["start"],
         "end": n["end"],

@@ -74,7 +74,12 @@ def fetch_notams(icao: str) -> list[dict]:
 
 
 def _fetch_source(icao: str, source: str) -> list[dict]:
-    return _fetch_nms(icao) if source == "nms" else _fetch_web(icao)
+    notams = _fetch_nms(icao) if source == "nms" else _fetch_web(icao)
+    # The FAA feed returns some records with NO text at all (seen at KEWR: seven
+    # "LTA-EWR-nn" entries with raw == ""). They carry nothing a pilot can read,
+    # and an empty body used to reach the AI layer and crash the whole briefing.
+    # Drop them here — at the source — so no later step ever sees a textless NOTAM.
+    return [n for n in notams if str(n.get("raw", "")).strip()]
 
 
 # ---------------- source: web (default, undocumented FAA NOTAM Search) ----------

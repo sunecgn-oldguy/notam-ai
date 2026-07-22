@@ -461,3 +461,39 @@ NOTAM-livscyklus: NOTAMR erstatter, NOTAMC annullerer → markér status ved hve
   prototypen kører let og billigt. **Næste mulige skridt (intet blokeret):** brug + pilot-feedback → iteration;
   app-features; eller produktions-planlægning (hosting, DB+mirror, kilde+licens) når EAD/FAA svarer.
   Ventende eksterne: **FAA prod-adgang** og **EUROCONTROL EAD-tilbud**.
+
+## 2026-07-22 — Server 500 på ruter med Newark: tekstløse NOTAMs (fundet via en tester)
+
+**Symptom:** en tester (pilotens far) fik "Something went wrong (server 500)" på flere forskellige
+ruter. Første mistanke var EET-feltet (skærmbilledet viste ETD som `23.30` med punktum, EET som
+`01:30` med kolon) — **forkert spor**. Isolering mod live server viste mønsteret: EKVG, BGO, CPH,
+EKCH, EGLL → 200; **EWR alene → 500**. Det var altid DEP der væltede den, ikke tiden.
+
+**Årsagskæde (rodfæstet, ikke gættet):**
+FAA-web-feeden returnerer for KEWR **7 poster helt uden tekst** (`raw == ""`, id `LTA-EWR-nn` —
+kun datoer, intet indhold). Tom tekst → Claude-kaldet får tomt content → API-fejl. Den fejl var
+allerede fanget i `_summarise_parallel`, som falder tilbage til `n["body"]` — men den er også tom,
+altså falsy. Og `_view` havde `n.get("_summary") or summarise(n)`: den `or`-fallback kaldte AI'en
+**igen, uden for try/except** → exception → 500 for hele briefingen. Derfor virkede det lokalt
+(AI slået fra, `_none` returnerer tom streng uden at kaste) og fejlede kun i produktion.
+
+**Rettelser (fire lag, så én dårlig NOTAM aldrig kan vælte en briefing igen):**
+- `faa.py::_fetch_source` — filtrerer tekstløse poster væk **ved kilden**, virker for begge kilder
+  og for CLI'en. KEWR: 30 → 23 NOTAMs, 0 tekstløse.
+- `llm.py::summarise` — guard: blank `raw` returnerer tidligt, sender aldrig tomt content til API'et.
+- `briefing.py::_view` — `or summarise(n)` fjernet; bruger den rensede body som fallback.
+- `server.py::make_briefing` — try/except omkring `briefing.build`: JSON-fejlsvar + traceback i
+  Render-loggen i stedet for Flasks bare HTML-500-side.
+- **Verificeret:** med *alle* AI-kald tvunget til at kaste → 200, 23 NOTAMs, 0 tomme summaries.
+
+**Tidsinput lavet fejlsikkert (pilotens ønske):** ETD og EET er nu `<select>`-rullemenuer i
+halvtimes-spring (ETD 00:00–23:30 = 48 valg, EET 00:30–12:00 = 24 valg) i stedet for tastet tekst.
+Baggrund: et telefon-numerisk tastatur har **ingen `:`**, og iOS viser tid som `08.00` i dansk
+locale — testeren kunne ikke skrive 08:00. `server.py::_hhmm` er samtidig gjort tolerant: den
+ignorerer separatorer (`08:00`/`0800`/`08.00`/`08 00` → 08:00) og **clamper** i stedet for at kaste
+— tidligere gav `2530` en `ValueError: hour must be in 0..23` → endnu en 500-kilde. `08.00` blev
+før stille fortolket som `00:00` (forkert briefing-vindue, ingen fejl vist) — også væk.
+
+**Læring:** en `or`-fallback der kalder en fejlbar funktion uden for det try/except der beskytter
+det oprindelige kald, ophæver beskyttelsen. Og: eksterne feeds leverer tomme poster — filtrér ved
+kilden, ikke nedstrøms.

@@ -97,7 +97,17 @@ def make_briefing():
             "message": "Too many briefings this hour. Please wait a bit and try again.",
         }), 429
     data = request.get_json(force=True, silent=True) or {}
-    return jsonify(briefing.build(_airports(data), _window(data)))
+    # Last line of defence: whatever breaks downstream, the pilot gets a readable
+    # reason instead of Flask's bare HTML 500 page. The traceback goes to the
+    # Render log so the cause is findable after the fact.
+    try:
+        return jsonify(briefing.build(_airports(data), _window(data)))
+    except Exception:
+        app.logger.exception("briefing failed for %s", data)
+        return jsonify({
+            "error": "briefing_failed",
+            "message": "Could not build the briefing. Please try again.",
+        }), 500
 
 
 @app.post("/feedback")
@@ -122,8 +132,18 @@ def _airports(data: dict) -> list[tuple[str, str]]:
 
 
 def _hhmm(s: str) -> tuple[int, int]:
-    m = re.match(r"(\d{1,2}):?(\d{2})", str(s))
-    return (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+    """'08:00', '0800', '08.00', '08 00' -> (8, 0). Anything unparseable -> (0, 0).
+
+    The separator is whatever the phone's keyboard produced: iOS shows a time as
+    '08.00' in Danish locale, and a numeric keypad has no ':' at all. So we ignore
+    separators entirely and read the digits. Out-of-range values are clamped, not
+    raised — hour=25 used to reach datetime.replace() and 500 the whole request.
+    """
+    digits = re.sub(r"\D", "", str(s))
+    if len(digits) < 3:                       # '', '8', '08' -> no usable time
+        return (0, 0)
+    h, m = int(digits[:-2]), int(digits[-2:])
+    return (min(h, 23), min(m, 59))
 
 
 def _window(data: dict) -> tuple[datetime, datetime]:

@@ -36,16 +36,16 @@
   .field{margin-bottom:13px;flex:1;min-width:0}
   .field label{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--ink);margin:0 2px 6px}
   .field label span{color:var(--faint);font-weight:400;letter-spacing:0;text-transform:none}
-  input{width:100%;font-family:var(--mono);font-size:16px;letter-spacing:.05em;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 13px;text-transform:uppercase}
+  input,select{width:100%;font-family:var(--mono);font-size:16px;letter-spacing:.05em;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 13px;text-transform:uppercase}
   input::placeholder{color:var(--faint);font-family:var(--ui);text-transform:none;letter-spacing:0}
-  input:focus{outline:none;border-color:var(--link);box-shadow:0 0 0 3px color-mix(in srgb,var(--link) 22%,transparent)}
-  /* Native time inputs render differently per platform (iOS: extra height;
-     desktop: an inner clock icon + spin buttons). Strip it all so ETD == EET. */
-  input[type=time]{-webkit-appearance:none;appearance:none;min-height:0}
-  input[type=time]::-webkit-date-and-time-value{margin:0;text-align:left}
-  input[type=time]::-webkit-calendar-picker-indicator{display:none}
-  input[type=time]::-webkit-inner-spin-button,
-  input[type=time]::-webkit-clear-button{-webkit-appearance:none;display:none;margin:0}
+  input:focus,select:focus{outline:none;border-color:var(--link);box-shadow:0 0 0 3px color-mix(in srgb,var(--link) 22%,transparent)}
+  /* ETD/EET are <select> pick-lists. Browsers render a native arrow at wildly
+     different sizes, so strip it and draw our own — the two fields then match
+     the text inputs above them exactly, on phone and desktop alike. */
+  select{-webkit-appearance:none;appearance:none;min-height:0;line-height:1.25;
+    background-image:linear-gradient(45deg,transparent 50%,var(--faint) 50%),linear-gradient(135deg,var(--faint) 50%,transparent 50%);
+    background-position:calc(100% - 16px) 50%,calc(100% - 11px) 50%;
+    background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:32px}
   .plain{font-family:var(--ui)!important;text-transform:none!important;letter-spacing:0!important;font-size:15px!important}
   .hint{font-size:11.5px;color:var(--faint);margin:2px 2px 16px}
   .hint code{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line2);border-radius:4px;padding:0 4px}
@@ -186,8 +186,11 @@
     </div>
     <p class="winnote" id="winnote"><b>Set times to get correctly tailored WX and NOTAM</b></p>
     <div class="row2">
-      <div class="field"><label>ETD <span>· UTC</span></label><input class="plain" id="etd" type="time" value="23:30"></div>
-      <div class="field"><label>EET <span>· hh:mm</span></label><input class="plain" id="eet" type="text" inputmode="numeric" value="01:30" placeholder="01:30"></div>
+      <!-- Both times are pick-lists, not typed input: a phone keypad has no ':'
+           and iOS renders times as '08.00', so typed values arrived malformed
+           (or crashed the server). A fixed half-hour list makes that impossible. -->
+      <div class="field"><label>ETD <span>· UTC</span></label><select class="plain" id="etd"></select></div>
+      <div class="field"><label>EET <span>· hh:mm</span></label><select class="plain" id="eet"></select></div>
     </div>
     <button class="btn" id="go">Get briefing</button>
     <div class="status" id="status"></div>
@@ -426,6 +429,19 @@
   });
 
   // The flight-window prompt above ETD/EET is static markup (see #winnote).
+
+  // Fill the two time pick-lists. ETD: 00:00-23:30 UTC. EET: 00:30-12:00 — a
+  // half-hour step throughout, which is the planning resolution a pilot uses.
+  function fillTimes(el, firstMin, lastMin, selected){
+    var html = '';
+    for(var m = firstMin; m <= lastMin; m += 30){
+      var t = ('0'+Math.floor(m/60)).slice(-2) + ':' + ('0'+(m%60)).slice(-2);
+      html += '<option value="'+t+'"'+(t===selected?' selected':'')+'>'+t+'</option>';
+    }
+    el.innerHTML = html;
+  }
+  fillTimes(document.getElementById('etd'), 0, 23*60+30, '23:30');
+  fillTimes(document.getElementById('eet'), 30, 12*60, '01:30');
 
   btn.addEventListener('click', function(){
     var etd = document.getElementById('etd').value;

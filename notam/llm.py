@@ -71,6 +71,11 @@ _STYLE = "9"
 
 def summarise(notam: dict) -> str:
     """Readable text for one enriched NOTAM, cached across all users."""
+    # Belt-and-braces: a textless NOTAM has nothing to rewrite, and sending empty
+    # content to the model is an API error. faa.py already drops these, so this is
+    # only a guard against a future source that lets one slip through.
+    if not str(notam.get("raw", "")).strip():
+        return notam.get("body", "")
     if triggers.is_document_ref(notam):
         return triggers.summary(notam)         # deterministic, no AI (no hallucination)
     ckey = _STYLE + "\x00" + notam["raw"]      # style version folded into the key
