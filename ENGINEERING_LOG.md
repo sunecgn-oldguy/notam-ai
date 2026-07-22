@@ -653,3 +653,28 @@ adskiller sig. Begge sorteringsveje (load + insert) er nu dækket hver for sig. 
 måler ingenting. Først `routes()` vs `airlines[0].routes` med Star Air aktiv, så igen ved sletning,
 nu insertion order vs sortering med kun ét element. Skriv testen så de to muligheder *kan* give
 forskellige svar — ellers tester den kun, at koden ikke crasher.
+
+## 2026-07-22 (7) — Et tomt flyselskab kunne aldrig slettes (fundet af piloten på skærmen)
+
+**Symptom (skærmbillede):** SAS-menuen var markeret, men edit-rækken sagde `Editing Star Air`, og
+"Delete airline" afviste med "Star Air is built into the app". Piloten spurgte om han gjorde noget
+forkert. Det gjorde han ikke.
+
+**Årsag:** aktivt selskab blev kun opdateret i `change`-handleren. En menu **uden ruter** har kun sit
+eget navn som eneste `<option>` — der er intet at skifte *til*, så `change` udløses aldrig. Et tomt
+selskab kunne derfor aldrig blive aktivt, og dermed aldrig slettes. Præcis det selskab man helst vil
+af med (oprettet ved en fejl) var det eneste, der sad fast.
+
+**Rettelse:** det er **fokus/berøring**, ikke valg, der afgør hvilken menu man arbejder i —
+`focusin` + `click` på containeren. Bevidst **ingen re-render** i den handler: at udskifte
+`<select>`-elementet mens piloten er ved at åbne det ville lukke dropdownen under fingeren. Kun
+`FLEETS.active`, `activeLabel` og "Editing …"-teksten opdateres. Hjælpeteksten er rettet fra
+"pick from another menu" til "tap another menu", som er det, der faktisk virker.
+
+**Test:** `tap()` (focusin uden valg) er tilføjet ved siden af `pick()`, og sletningen af et selskab
+går nu gennem `tap()` — altså den vej piloten faktisk gik — i stedet for en `change` med tom værdi,
+som virkeligheden aldrig producerer. Fjernes de to `addEventListener`-linjer, fejler testen igen.
+
+**Læring:** testen bestod, mens appen var i stykker, fordi testens *hændelse* ikke var pilotens
+hændelse. `change` med tom værdi kan simuleres, men opstår aldrig i en menu uden valgmuligheder. Når
+man stubber DOM'en, skal man teste den interaktion brugeren har — ikke den, der er nemmest at kalde.

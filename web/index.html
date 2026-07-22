@@ -545,9 +545,32 @@
                return opt(r.label, r.label, mine && r.label === activeLabel);
              }).join('') + '</select>';
     }).join('');
-    editForEl.innerHTML = 'Editing <b>' + esc(airline().name) + '</b>' +
-      (FLEETS.airlines.length > 1 ? ' — pick from another menu to switch' : '');
+    showEditing();
   }
+
+  function showEditing(){
+    editForEl.innerHTML = 'Editing <b>' + esc(airline().name) + '</b>' +
+      (FLEETS.airlines.length > 1 ? ' — tap another menu to switch' : '');
+  }
+
+  // Which airline you are working on follows the menu you TOUCH, not the one you
+  // pick a route from. An airline with no routes has nothing to pick, so it never
+  // fires 'change' — before this it could never become active, and an empty
+  // airline created by mistake could therefore never be deleted.
+  // Deliberately no re-render here: replacing the <select> while the pilot is
+  // opening it would close the dropdown under their finger.
+  function touchAirline(e){
+    var sel = e && e.target;
+    if(!sel || !sel.dataset || sel.dataset.air === undefined) return;
+    var a = FLEETS.airlines[+sel.dataset.air];
+    if(!a || a.name === FLEETS.active) return;
+    FLEETS.active = a.name;
+    activeLabel = null;              // a route from the previous airline no longer applies
+    saveFleets();
+    showEditing();
+  }
+  airlinesEl.addEventListener('focusin', touchAirline);
+  airlinesEl.addEventListener('click', touchAirline);   // belt and braces on touch
 
   // One handler for every menu: which airline it belongs to is on the element.
   airlinesEl.addEventListener('change', function(e){

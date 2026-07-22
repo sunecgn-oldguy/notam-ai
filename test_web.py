@@ -117,6 +117,9 @@ function menus(){                         // -> [[airline label, route, route...
 function pick(airlineIndex, routeLabel){  // choosing from one airline's menu
   airlinesEl.fire("change", {target:{dataset:{air:String(airlineIndex)}, value:routeLabel}});
 }
+function tap(airlineIndex){              // just opening a menu, choosing nothing
+  airlinesEl.fire("focusin", {target:{dataset:{air:String(airlineIndex)}, value:""}});
+}
 
 ok("one menu, labelled Star Air", menus().length, 1);
 ok("the menu is the airline name plus its routes",
@@ -180,14 +183,23 @@ CONFIRM=true; document.getElementById("delRoute").fire("click");
 ok("deleting from a later airline leaves Star Air alone",
    [FLEETS.airlines[1].routes.length, FLEETS.airlines[0].routes.length], [0, 12]);
 
+// An airline with no routes has nothing to pick, so it never fires 'change'.
+// Touching its menu has to be enough to work on it — otherwise an empty airline
+// can never be selected and never deleted (the pilot hit exactly this).
+pick(0, "CGN–BER");                       // Star Air active, via a real selection
+tap(1);
+ok("touching an empty airline's menu makes it the one being edited",
+   FLEETS.active, "Nordic");
+
 // Star Air is built in, so it is never deletable — even with its menu selected.
-pick(0, "");
+tap(0);
 LOG.length=0; CONFIRM=true; document.getElementById("delAirline").fire("click");
 ok("Star Air cannot be deleted",
    [menus().length, LOG.length===1 && LOG[0].indexOf("built into the app")>0], [2, true]);
 
-// A pilot's own airline can go, and takes its routes with it.
-pick(1, "");
+// A pilot's own airline can go — reached the way the pilot reaches it, by
+// tapping an empty menu rather than selecting from it.
+tap(1);
 document.getElementById("delAirline").fire("click");
 ok("an added airline is deleted", [menus().length, menus()[0][0]], [1, "Star Air"]);
 ok("...and the deletion is stored", loadFleets().airlines.length, 1);
