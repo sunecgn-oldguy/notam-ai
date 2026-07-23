@@ -741,19 +741,25 @@ kvoten kan være opbrugt af fremmede. Det er derfor lifetime-tallene på `/stats
 "not available". Med token: 5000 kald i timen. Bruges kun til læsning.
 *Allerede sat: `STATS_KEY`, `GIST_ID`, `ANTHROPIC_API_KEY`, `NOTAM_LLM`, `FEEDBACK_*`.*
 
-**2. Brugertællingen lander IKKE endnu — én ting at tjekke**
-Din manuelle kørsel virkede: Gist'en blev skrevet kl. 21:44 UTC, og token-tallene voksede (1112
-kald, 830.952 tokens). **Men `pilots` og `briefings` blev skrevet som 0**, selvom serveren på det
-tidspunkt havde 2 piloter og 2 briefinger i hukommelsen. Det betyder, at jobbet kunne skrive til
-Gist'en, men **ikke kunne læse `/stats.json` fra appen** — altså at `STATS_KEY` på GitHub ikke er
-identisk med den på Render. Mest sandsynligt et mellemrum eller linjeskift, der er kommet med ved
-indsætningen.
+**2. Brugertællingen står på 0 — næsten sikkert pga. aftenens mange redeploys, IKKE nøglen**
+RETTELSE af en forhastet konklusion. Verificeret 2026-07-23: `STATS_KEY` **virker** på Render
+(`/stats.json?key=...` gav 200 med en rigtig enhed; forkert nøgle gav 404). Optællingskoden er
+gennemgået og korrekt. Så den tidligere teori om nøgle-mismatch var et gæt, ikke et bevis.
 
-Tjek: GitHub → Actions → keep-alive → nyeste kørsel → fold `usage` ud. Står der
-`[usage-log] stats unavailable (HTTP Error 404 ...)`, er det bekræftet — så slet secreten
-`STATS_KEY` og opret den igen med præcis `Tsdvj6dlSKUpt9yY9KFEVjUum9vcnAxO` (uden mellemrum
-foran/bagefter). Står der derimod `[usage-log] pilots N`, virker det, og tallene var bare nul, fordi
-serveren lige var redeployet.
+**Reel årsag:** tælleren lever kun i hukommelsen (`notam/stats.py`: "resets when the server
+restarts"). I aften udløste vi ~9 redeploys (hvert push + hver gemt Render-variabel), som hver
+nulstillede pilot-tallet. Keep-alive aflæser kun ~hvert 75. min (GitHubs cron er langsom på gratis-
+planen). Så pilot-tal nåede at blive nulstillet af en redeploy, før keep-alive kunne måle det —
+tallet blev aldrig forkert *læst*, det var reelt 0 på måletidspunktet.
+
+**Konsekvens:** når vi holder op med at deploye, akkumulerer den normalt (serveren samler enheder
+mellem målingerne; keep-alive unioner dem ind i Gist'en). Ikke 100 % præcis — en pilot der bruger
+appen kort før en redeploy kan gå tabt — men brugbar i drift. En rigtig præcis løsning ville kræve
+at serveren skrev til Gist'en ved hver briefing (for mange GitHub-writes) eller en rigtig database.
+
+**Eneste tilbageværende mulighed for nøgle-mismatch** afgøres i `usage`-trinnet i keep-alive-loggen:
+`stats unavailable (HTTP Error 404)` = nøglerne er alligevel forskellige (slet + genopret GitHub-
+secreten `STATS_KEY`). `[usage-log] pilots 0` uden fejl = den læste fint, og det var redeploy-timing.
 
 **2b. Bekræft bagefter**
 GitHub → Actions → keep-alive → nyeste kørsel → fold `usage` ud. Der skal stå
